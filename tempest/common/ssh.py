@@ -21,6 +21,15 @@ import select
 import socket
 import time
 import warnings
+import base64
+import getpass
+import glob
+import os
+import socket
+import sys
+import traceback
+
+
 
 from tempest import exceptions
 
@@ -35,6 +44,7 @@ class Client(object):
     def __init__(self, host, username, password=None, timeout=300, pkey=None,
                  channel_timeout=10, look_for_keys=False, key_filename=None):
         self.host = host
+        self.port = 22
         self.username = username
         self.password = password
         if isinstance(pkey, basestring):
@@ -92,6 +102,78 @@ class Client(object):
             ssh.close()
         except (EOFError, paramiko.AuthenticationException, socket.error):
             return
+
+    def agent_auth(self, transport, username):
+        """
+        Attempt to authenticate to the given transport using a local private RSA key file (assumes no pass phrase).
+        """
+        # try:
+        #     ki = paramiko.RSAKey.from_private_key_file(self.private_key)
+        # except Exception, e:
+        #     print 'Failed loading' % (self.private_key, e)
+
+        agent = paramiko.Agent()
+        agent_keys = agent.get_keys() + (self.pkey,)
+        if len(agent_keys) == 0:
+            return
+
+        for key in agent_keys:
+         #   print 'Trying ssh-agent key %s' % key.get_fingerprint().encode('hex'),
+            try:
+                transport.auth_publickey(username, key)
+          #      print '... success!'
+                return
+            except paramiko.SSHException, e:
+                print 'Trying ssh-agent key ... failed!', e
+
+    def sftp(self, source, destination):
+
+        try:
+            #import pdb
+            #pdb.set_trace()
+            #print 'Establishing SSH connection to:', hostname, port, '...'
+            transport = paramiko.Transport((self.host, self.port))
+            transport.start_client()
+            self.agent_auth(transport, self.username)
+            sftp = transport.open_session()
+            sftp = paramiko.SFTPClient.from_transport(transport)
+            is_up_to_date = False
+
+            try:
+                sftp.mkdir(destination)
+            except IOError, e:
+                pass
+                #print '(assuming ', destination, 'exists)'
+
+            destination_file = destination + '/' + os.path.basename(source)
+            try:
+                if sftp.stat(destination):
+                    source_data = open(source, "rb").read()
+                    destination_data = sftp.open(destination_file).read()
+                    md1 = md5.new(source_data).digest()
+                    md2 = md5.new(destination_data).digest()
+                    if md1 == md2:
+                        is_up_to_date = True
+                 #       print "UNCHANGED:", os.path.basename(source)
+                 #   else:
+                       # print "MODIFIED:", os.path.basename(source),
+            except:
+                pass
+                #print "NEW: ", os.path.basename(source),
+
+            if not is_up_to_date:
+                #print 'Copying', source, 'to ', destination_file
+                sftp.put(source, destination_file)
+                return "Success"
+
+        except Exception, e:
+            return '*** Caught exception: %s: %s' % (e.__class__, e)
+            try:
+                transport.close()
+            except:
+                pass
+
+
 
     def exec_command(self, cmd):
         """

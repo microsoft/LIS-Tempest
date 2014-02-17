@@ -71,6 +71,20 @@ class RemoteClient():
         output = self.ssh_client.exec_command(command)
         return int(output)
 
+    def copy_over(self, source, destination):
+        output = self.ssh_client.sftp(source, destination)
+        return output
+
+    def verify_lis_modules(self):
+        command = 'lsmod | grep hv_ | wc -l'
+        output = self.ssh_client.exec_command(command)
+        return int(output)
+
+    def verify_timesync_ntp(self):
+        command = 'lsmod | grep hv_ | wc -l'
+        output = self.ssh_client.exec_command(command)
+        return int(output)
+
     def get_partitions(self):
         # Return the contents of /proc/partitions
         command = 'cat /proc/partitions'

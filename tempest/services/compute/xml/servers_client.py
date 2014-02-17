@@ -128,6 +128,7 @@ def _translate_server_xml_to_json(xml_dom):
         json['OS-SRV-USG:terminated_at'] = json.pop(terminated_at)
     if launched_at in json:
         json['OS-SRV-USG:launched_at'] = json.pop(launched_at)
+
     if power_state in json:
         json['OS-EXT-STS:power_state'] = json.pop(power_state)
     if availability_zone in json:

@@ -34,6 +34,9 @@ class FloatingIPsTestJSON(base.BaseComputeTest):
         cls.client = cls.floating_ips_client
         cls.servers_client = cls.servers_client
 
+        #import pdb
+        #pdb.set_trace()
+
         # Server creation
         resp, server = cls.create_server(wait_until='ACTIVE')
         cls.server_id = server['id']
