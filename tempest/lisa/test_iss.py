@@ -368,15 +368,15 @@ class TestLis(manager.NetworkScenarioTest):
 
         self.assertEqual(ok, True)
 
-    # @services('compute', 'network')
-    # def test_integrated_shutdown_services(self):
-    #     self._create_keypairs()
-    #     self._create_security_groups()
-    #     self._create_networks()
-    #    # self._check_networks()
-    #     self._create_servers()
-    #     self._assign_floating_ips()
-    #     self._check_integrated_shutdown_services()
-    #     #self._check_tenant_network_connectivity()
+    @services('compute', 'network')
+    def test_integrated_shutdown_services(self):
+        self._create_keypairs()
+        self._create_security_groups()
+        self._create_networks()
+       # self._check_networks()
+        self._create_servers()
+        self._assign_floating_ips()
+        self._check_integrated_shutdown_services()
+        #self._check_tenant_network_connectivity()
 
 
