@@ -307,8 +307,8 @@ class TestLis(manager.NetworkScenarioTest):
         source = os.path.join(os.path.dirname(__file__), '..', 'trollberta/bash-scripts/') + script
         destination = '/root/'
 
-        import pdb
-        pdb.set_trace()
+#        import pdb
+ #       pdb.set_trace()
         copy_file = linux_client.copy_over(source, destination)
 
         output = linux_client.ssh_client.exec_command('cd /root/; dos2unix -q ' + script + ';' + ' chmod +x ' + script +';' + ' ./' + script)
