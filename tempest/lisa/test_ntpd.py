@@ -26,7 +26,7 @@ from tempest.lisa import manager
 from tempest.test import attr
 from tempest.test import services
 from tempest.common.utils.windows.remote_client import WinRemoteClient
-#import sys
+import os
 
 LOG = logging.getLogger(__name__)
 
