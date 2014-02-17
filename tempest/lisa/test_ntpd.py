@@ -304,7 +304,7 @@ class TestLis(manager.NetworkScenarioTest):
         linux_client = RemoteClient(ip, username, pkey=private_key)
         #output = linux_client.verify_lis_modules()
         script = 'timesync-ntp.sh'
-         source = os.path.join(os.path.dirname(__file__), '..', '..', 'trollberta/bash-scripts/') + script
+        source = os.path.join(os.path.dirname(__file__), '..', '..', 'trollberta/bash-scripts/') + script
         destination = '/root/'
 
         copy_file = linux_client.copy_over(source, destination)
