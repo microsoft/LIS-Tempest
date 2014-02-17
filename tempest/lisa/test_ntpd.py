@@ -304,10 +304,10 @@ class TestLis(manager.NetworkScenarioTest):
         linux_client = RemoteClient(ip, username, pkey=private_key)
         #output = linux_client.verify_lis_modules()
         script = 'timesync-ntp.sh'
-        source = '/root/Dropbox/+LIS/tempest/tempest/trollberta/bash-scripts/'+script
+         source = os.path.join(os.path.dirname(__file__), '..', '..', 'trollberta/bash-scripts/') + script
         destination = '/root/'
 
-        copy_file = linux_client.copy_over('/root/Dropbox/+LIS/tempest/tempest/trollberta/bash-scripts/'  + script, destination)
+        copy_file = linux_client.copy_over(source, destination)
 
         output = linux_client.ssh_client.exec_command('cd /root/; dos2unix -q ' + script + ';' + ' chmod +x ' + script +';' + ' ./' + script)
 
