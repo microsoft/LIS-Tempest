@@ -113,3 +113,18 @@ class RemoteClient():
         # Get pid(s) of a process/program
         cmd = "ps -ef | grep %s | grep -v 'grep' | awk {'print $1'}" % pr_name
         return self.exec_command(cmd).split('\n')
+
+    def verify_lis_modules(self):
+        command = 'lsmod | grep hv_ | wc -l'
+        output = self.exec_command(command)
+        return int(output)
+
+    def verify_timesync_ntp(self):
+        """TODO: actually implement"""
+        command = 'lsmod | grep hv_ | wc -l'
+        output = self.exec_command(command)
+        return int(output)
+
+    def verify_external_ping(self, destination_ip):
+        cmd = "ping -c 10 {destination_ip}".format(destination_ip=destination_ip)
+        return self.exec_command(cmd)

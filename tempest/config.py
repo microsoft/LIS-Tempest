@@ -252,6 +252,18 @@ ComputeGroup = [
                     'test the floating IP bulk feature for CRUD operation.')
 ]
 
+host_group = cfg.OptGroup(name='host_credentials',
+                             title='Hyper-V Host credentials')
+
+HostGroup = [
+    cfg.StrOpt('host_user_name',
+               help="Valid Hyper-V host credential "
+                    "This is a required option"),
+    cfg.StrOpt('host_password',
+               help="Valid Hyper-V host credential "
+                    "This is a required option")
+]
+
 compute_features_group = cfg.OptGroup(name='compute-feature-enabled',
                                       title="Enabled Compute Service Features")
 
@@ -1015,6 +1027,7 @@ NegativeGroup = [
 def register_opts():
     register_opt_group(cfg.CONF, auth_group, AuthGroup)
     register_opt_group(cfg.CONF, compute_group, ComputeGroup)
+    register_opt_group(cfg.CONF, host_group, HostGroup)
     register_opt_group(cfg.CONF, compute_features_group,
                        ComputeFeaturesGroup)
     register_opt_group(cfg.CONF, identity_group, IdentityGroup)
