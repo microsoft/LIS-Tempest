@@ -21,7 +21,6 @@ resources in a declarative way.
 
 import argparse
 import datetime
-import logging
 import os
 import sys
 import unittest
@@ -31,6 +30,7 @@ import yaml
 import tempest.auth
 from tempest import config
 from tempest import exceptions
+from tempest.openstack.common import log as logging
 from tempest.openstack.common import timeutils
 from tempest.services.compute.json import flavors_client
 from tempest.services.compute.json import servers_client
@@ -362,7 +362,7 @@ def destroy_objects(objects):
     for obj in objects:
         client = client_for_user(obj['owner'])
         r, body = client.objects.delete_object(obj['container'], obj['name'])
-        if not (200 >= int(r['status']) < 299):
+        if not (200 <= int(r['status']) < 299):
             raise ValueError("unable to destroy object: [%s] %s" % (r, body))
 
 
@@ -564,7 +564,6 @@ def destroy_resources():
     destroy_servers(RES['servers'])
     destroy_images(RES['images'])
     destroy_objects(RES['objects'])
-    destroy_servers(RES['servers'])
     destroy_volumes(RES['volumes'])
     destroy_users(RES['users'])
     destroy_tenants(RES['tenants'])
@@ -617,21 +616,10 @@ def get_options():
         config.CONF.set_config_path(OPTS.config_file)
 
 
-def setup_logging(debug=True):
+def setup_logging():
     global LOG
+    logging.setup(__name__)
     LOG = logging.getLogger(__name__)
-    if debug:
-        LOG.setLevel(logging.DEBUG)
-    else:
-        LOG.setLevel(logging.INFO)
-
-    ch = logging.StreamHandler(sys.stdout)
-    ch.setLevel(logging.DEBUG)
-    formatter = logging.Formatter(
-        datefmt='%Y-%m-%d %H:%M:%S',
-        fmt='%(asctime)s.%(msecs).03d - %(levelname)s - %(message)s')
-    ch.setFormatter(formatter)
-    LOG.addHandler(ch)
 
 
 def main():
