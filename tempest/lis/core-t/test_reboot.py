@@ -1,4 +1,5 @@
 # Copyright 2014 Cloudbase Solutions Srl
+# All rights reserved
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
 #    not use this file except in compliance with the License. You may obtain
@@ -13,6 +14,7 @@
 #    under the License.
 
 from tempest import config
+from tempest.common import debug
 from tempest.lis import manager
 from tempest.openstack.common import log as logging
 from tempest.scenario import utils as test_utils
@@ -63,15 +65,12 @@ class TestLis(manager.ScenarioTest):
                       image=self.image_ref, flavor=self.flavor_ref,
                       ssh=self.run_ssh, ssh_user=self.ssh_user))
 
-    def create_flavor(self):
-         resp, flavor = self.client.create_flavor(flavor_name,
-                                                ram, vcpus,
-                                                 self.disk,
-                                                 flavor_id,
-                                                 ephemeral=self.ephemeral,
-                                                 swap=self.swap,
-                                                 rxtx=self.rxtx)
-        self.addCleanup(self.flavor_clean_up, flavor['id'])
+    def _wait_for_server_status(self, status):
+        instance_id = self.instance['id']
+        # Raise on error defaults to True, which is consistent with the
+        # original function from scenario tests here
+        self.servers_client.wait_for_server_status(instance_id, status)
+
     def add_keypair(self):
         self.keypair = self.create_keypair()
 
@@ -86,42 +85,49 @@ class TestLis(manager.ScenarioTest):
                                            flavor=self.flavor_ref,
                                            create_kwargs=create_kwargs)
 
-    def verify_ssh(self):
-        if self.run_ssh:
-            # Obtain a floating IP
-            _, floating_ip = self.floating_ips_client.create_floating_ip()
-            self.addCleanup(self.delete_wrapper,
-                            self.floating_ips_client.delete_floating_ip,
-                            floating_ip['id'])
-            # Attach a floating IP
-            self.floating_ips_client.associate_floating_ip_to_server(
-                floating_ip['ip'], self.instance['id'])
-            # Check lis presence
-            try:
-                linux_client = self.get_remote_client(
-                    server_or_ip=floating_ip['ip'],
-                    username=self.image_utils.ssh_user(self.image_ref),
-                    private_key=self.keypair['private_key'])
-                output = linux_client.verify_lis_modules()
-                LOG.info('Found %s lis modules', output)
-                self.assertNotEqual(0, output)
-            except Exception:
-                LOG.exception('ssh to server failed')
-                self._log_console_output()
-                raise
+    def nova_reboot(self):
+        self.servers_client.reboot(self.instance['id'], 'SOFT')
+        self._wait_for_server_status('ACTIVE')
+
+    def nova_floating_ip_create(self):
+        _, self.floating_ip = self.floating_ips_client.create_floating_ip()
+        self.addCleanup(self.delete_wrapper,
+                        self.floating_ips_client.delete_floating_ip,
+                        self.floating_ip['id'])
+
+    def nova_floating_ip_add(self):
+        self.floating_ips_client.associate_floating_ip_to_server(
+            self.floating_ip['ip'], self.instance['id'])
+
+    def ssh_to_server(self):
+        try:
+            linux_client = self.get_remote_client(
+                server_or_ip=self.floating_ip['ip'],
+                username=self.image_utils.ssh_user(self.image_ref),
+                private_key=self.keypair['private_key'])
+        except Exception as e:
+            LOG.exception('ssh to server failed')
+            self._log_console_output()
+            # network debug is called as part of ssh init
+            if not isinstance(e, test.exceptions.SSHTimeout):
+                debug.log_net_debug()
+            raise
+
+    def several_reboot(self, count):
+        try:
+            for _ in range(count):
+                self.ssh_to_server()
+                self.nova_reboot()
+        except Exception as e:
+            LOG.exception('Reboot failed at iteration %d', _)
+            raise
 
     @test.services('compute', 'network')
-    def test_lis_smp(self):
+    def test_multiple_reboot(self):
         self.add_keypair()
         self.security_group = self._create_security_group()
         self.boot_instance()
-        self.verify_ssh()
-        server_id = self.instance['id']
-        resp, _ = self.servers_client.resize(server_id, self.flavor_ref_alt)
-        self.assertEqual(202, resp.status)
-        self.servers_client.wait_for_server_status(server_id, 'VERIFY_RESIZE')
-        self.servers_client.confirm_resize(server_id)
-        self.servers_client.wait_for_server_status(server_id, 'ACTIVE')
-
-        resp, body = self.client.list_migrations()
+        self.nova_floating_ip_create()
+        self.nova_floating_ip_add()
+        self.several_reboot(2)
         self.servers_client.delete_server(self.instance['id'])

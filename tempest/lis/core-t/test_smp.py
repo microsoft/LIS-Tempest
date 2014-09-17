@@ -1,4 +1,5 @@
 # Copyright 2014 Cloudbase Solutions Srl
+# All rights reserved
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
 #    not use this file except in compliance with the License. You may obtain
@@ -63,6 +64,15 @@ class TestLis(manager.ScenarioTest):
                       image=self.image_ref, flavor=self.flavor_ref,
                       ssh=self.run_ssh, ssh_user=self.ssh_user))
 
+    def create_flavor(self):
+         resp, flavor = self.client.create_flavor(flavor_name,
+                                                ram, vcpus,
+                                                 self.disk,
+                                                 flavor_id,
+                                                 ephemeral=self.ephemeral,
+                                                 swap=self.swap,
+                                                 rxtx=self.rxtx)
+        self.addCleanup(self.flavor_clean_up, flavor['id'])
     def add_keypair(self):
         self.keypair = self.create_keypair()
 
@@ -77,7 +87,7 @@ class TestLis(manager.ScenarioTest):
                                            flavor=self.flavor_ref,
                                            create_kwargs=create_kwargs)
 
-    def verify_lis(self):
+    def verify_ssh(self):
         if self.run_ssh:
             # Obtain a floating IP
             _, floating_ip = self.floating_ips_client.create_floating_ip()
@@ -102,9 +112,17 @@ class TestLis(manager.ScenarioTest):
                 raise
 
     @test.services('compute', 'network')
-    def test_server_lis_presence(self):
+    def test_lis_smp(self):
         self.add_keypair()
         self.security_group = self._create_security_group()
         self.boot_instance()
-        self.verify_lis()
+        self.verify_ssh()
+        server_id = self.instance['id']
+        resp, _ = self.servers_client.resize(server_id, self.flavor_ref_alt)
+        self.assertEqual(202, resp.status)
+        self.servers_client.wait_for_server_status(server_id, 'VERIFY_RESIZE')
+        self.servers_client.confirm_resize(server_id)
+        self.servers_client.wait_for_server_status(server_id, 'ACTIVE')
+
+        resp, body = self.client.list_migrations()
         self.servers_client.delete_server(self.instance['id'])

@@ -1,4 +1,5 @@
 # Copyright 2014 Cloudbase Solutions Srl
+# All rights reserved
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
 #    not use this file except in compliance with the License. You may obtain
@@ -14,6 +15,7 @@
 
 from tempest import config
 from tempest.common import debug
+from tempest.common.utils.windows.remote_client import WinRemoteClient
 from tempest.lis import manager
 from tempest.openstack.common import log as logging
 from tempest.scenario import utils as test_utils
@@ -84,6 +86,9 @@ class TestLis(manager.ScenarioTest):
                                            flavor=self.flavor_ref,
                                            create_kwargs=create_kwargs)
 
+        self.instance_name = self.instance["OS-EXT-SRV-ATTR:instance_name"]
+        self.host_name = self.instance["OS-EXT-SRV-ATTR:hypervisor_hostname"]
+
     def nova_reboot(self):
         self.servers_client.reboot(self.instance['id'], 'SOFT')
         self._wait_for_server_status('ACTIVE')
@@ -98,35 +103,50 @@ class TestLis(manager.ScenarioTest):
         self.floating_ips_client.associate_floating_ip_to_server(
             self.floating_ip['ip'], self.instance['id'])
 
-    def ssh_to_server(self):
+    def get_vm_time(self):
         try:
             linux_client = self.get_remote_client(
                 server_or_ip=self.floating_ip['ip'],
                 username=self.image_utils.ssh_user(self.image_ref),
                 private_key=self.keypair['private_key'])
-        except Exception as e:
+
+            unix_time = linux_client.get_unix_time()
+            LOG.info('VM unix time', unix_time)
+        except Exception:
             LOG.exception('ssh to server failed')
             self._log_console_output()
-            # network debug is called as part of ssh init
-            if not isinstance(e, test.exceptions.SSHTimeout):
-                debug.log_net_debug()
             raise
+        return unix_time
 
-    def several_reboot(self, count):
+    def get_host_time(self):
+        """ use actual credentials from conf file"""
+        username = CONF.host_credentials.host_user_name
+        password = CONF.host_credentials.host_password
+
+        """Get host time"""
+        cmd = 'powershell -Command ((Get-Date -UFormat %s) -Replace(\"[,\\.]\\d*\", \"\"))'
+
+        wsmancmd = WinRemoteClient(self.host_name, username, password)
+        LOG.debug('Sending command %s', cmd)
         try:
-            for _ in range(count):
-                self.ssh_to_server()
-                self.nova_reboot()
-        except Exception as e:
-            LOG.exception('Reboot failed at iteration %d', _)
-            raise
+            std_out, std_err, exit_code = wsmancmd.run_wsman_cmd(cmd)
+
+        except Exception as exc:
+            LOG.exception(exc)
+            raise exc
+
+        LOG.debug('Command std_out: %s', std_out)
+        LOG.debug('Command std_err: %s', std_err)
+
+        return int(std_out)
 
     @test.services('compute', 'network')
-    def test_multiple_reboot(self):
+    def test_time_sync_host(self):
         self.add_keypair()
         self.security_group = self._create_security_group()
         self.boot_instance()
         self.nova_floating_ip_create()
         self.nova_floating_ip_add()
-        self.several_reboot(2)
+        vm_time = self.get_vm_time()
+        host_time = self.get_host_time()
         self.servers_client.delete_server(self.instance['id'])
