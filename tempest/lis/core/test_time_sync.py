@@ -13,6 +13,7 @@
 #    under the License.
 
 from tempest import config
+from tempest.common import debug
 from tempest.common.utils.windows.remote_client import WinRemoteClient
 from tempest.lis import manager
 from tempest.openstack.common import log as logging
@@ -56,8 +57,6 @@ class TestLis(manager.ScenarioTest):
                     image=self.image_ref, flavor=self.flavor_ref
                 )
             )
-        self.host_name = ""
-        self.instance_name = ""
         self.run_ssh = CONF.compute.run_ssh and \
             self.image_utils.is_sshable_image(self.image_ref)
         self.ssh_user = self.image_utils.ssh_user(self.image_ref)
@@ -65,6 +64,12 @@ class TestLis(manager.ScenarioTest):
                   'Run ssh: {ssh}, user: {ssh_user}'.format(
                       image=self.image_ref, flavor=self.flavor_ref,
                       ssh=self.run_ssh, ssh_user=self.ssh_user))
+
+    def _wait_for_server_status(self, status):
+        instance_id = self.instance['id']
+        # Raise on error defaults to True, which is consistent with the
+        # original function from scenario tests here
+        self.servers_client.wait_for_server_status(instance_id, status)
 
     def add_keypair(self):
         self.keypair = self.create_keypair()
@@ -79,54 +84,68 @@ class TestLis(manager.ScenarioTest):
         self.instance = self.create_server(image=self.image_ref,
                                            flavor=self.flavor_ref,
                                            create_kwargs=create_kwargs)
+
         self.instance_name = self.instance["OS-EXT-SRV-ATTR:instance_name"]
         self.host_name = self.instance["OS-EXT-SRV-ATTR:hypervisor_hostname"]
 
-    def verify_integrated_shutdown_services(self):
+    def nova_reboot(self):
+        self.servers_client.reboot(self.instance['id'], 'SOFT')
+        self._wait_for_server_status('ACTIVE')
+
+    def nova_floating_ip_create(self):
+        _, self.floating_ip = self.floating_ips_client.create_floating_ip()
+        self.addCleanup(self.delete_wrapper,
+                        self.floating_ips_client.delete_floating_ip,
+                        self.floating_ip['id'])
+
+    def nova_floating_ip_add(self):
+        self.floating_ips_client.associate_floating_ip_to_server(
+            self.floating_ip['ip'], self.instance['id'])
+
+    def get_vm_time(self):
+        try:
+            linux_client = self.get_remote_client(
+                server_or_ip=self.floating_ip['ip'],
+                username=self.image_utils.ssh_user(self.image_ref),
+                private_key=self.keypair['private_key'])
+
+            unix_time = linux_client.get_unix_time()
+            LOG.info('VM unix time', unix_time)
+        except Exception:
+            LOG.exception('ssh to server failed')
+            self._log_console_output()
+            raise
+        return unix_time
+
+    def get_host_time(self):
+        """ use actual credentials from conf file"""
         username = CONF.host_credentials.host_user_name
         password = CONF.host_credentials.host_password
-        base_cmd = 'powershell {command} -ComputerName ' + self.host_name + ' -VMName ' + self.instance_name + ' -Name Shutdown'
-        get_iss = base_cmd.format(command='Get-VMIntegrationService')
-        disable_iss = base_cmd.format(command='Disable-VMIntegrationService')
-        enable_iss = base_cmd.format(command='Enable-VMIntegrationService')
+
+        """Get host time"""
+        cmd = 'powershell -Command ((Get-Date -UFormat %s) -Replace(\"[,\\.]\\d*\", \"\"))'
 
         wsmancmd = WinRemoteClient(self.host_name, username, password)
+        LOG.debug('Sending command %s', cmd)
+        try:
+            std_out, std_err, exit_code = wsmancmd.run_wsman_cmd(cmd)
 
-        std_out, std_err, exit_code = wsmancmd.run_wsman_cmd('powershell pwd')
+        except Exception as exc:
+            LOG.exception(exc)
+            raise exc
 
-        LOG.debug('Executing %s', get_iss)
-        std_out, std_err, exit_code = wsmancmd.run_wsman_cmd(get_iss)
-        LOG.debug(std_out)
-        LOG.debug(std_err)
+        LOG.debug('Command std_out: %s', std_out)
+        LOG.debug('Command std_err: %s', std_err)
 
-        LOG.debug('Executing %s', disable_iss)
-        std_out, std_err, exit_code = wsmancmd.run_wsman_cmd(disable_iss)
-        LOG.debug(std_out)
-        LOG.debug(std_err)
-
-        LOG.debug('Executing %s', get_iss)
-        std_out, std_err, exit_code = wsmancmd.run_wsman_cmd(get_iss)
-        LOG.debug(std_out)
-        LOG.debug(std_err)
-
-        LOG.debug('Executing %s', enable_iss)
-        std_out, std_err, exit_code = wsmancmd.run_wsman_cmd(enable_iss)
-        LOG.debug(std_out)
-        LOG.debug(std_err)
-
-        LOG.debug('Executing %s', get_iss)
-        std_out, std_err, exit_code = wsmancmd.run_wsman_cmd(get_iss)
-        LOG.debug(std_out)
-        LOG.debug(std_err)
-
-        ok = "OK" in std_out
-
-        self.assertEqual(ok, True)
+        return int(std_out)
 
     @test.services('compute', 'network')
-    def test_iss(self):
+    def test_time_sync_host(self):
         self.add_keypair()
         self.security_group = self._create_security_group()
         self.boot_instance()
-        self.verify_integrated_shutdown_services()
+        self.nova_floating_ip_create()
+        self.nova_floating_ip_add()
+        vm_time = self.get_vm_time()
+        host_time = self.get_host_time()
         self.servers_client.delete_server(self.instance['id'])

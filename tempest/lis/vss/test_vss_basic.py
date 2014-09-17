@@ -1,5 +1,4 @@
-# Copyright 2014 Cloudbase Solutions
-# All Rights Reserved.
+# Copyright 2014 Cloudbase Solutions Srl
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
 #    not use this file except in compliance with the License. You may obtain
@@ -83,27 +82,29 @@ class TestLis(manager.ScenarioTest):
         self.instance_name = self.instance["OS-EXT-SRV-ATTR:instance_name"]
         self.host_name = self.instance["OS-EXT-SRV-ATTR:hypervisor_hostname"]
 
-    def bacup_vm(self):
+   
+
+
+
+
+
+   def backup_vm(self):
         """ use actual credentials from conf file"""
         username = CONF.host_credentials.host_user_name
         password = CONF.host_credentials.host_password
+        cmd = 'powershell -Command ./$home/vss_backup.ps1 -ComputerName ' + self.host_name +' -VMName '+  self.instance_name +' -Name Heartbeat).Enabled'
+
         wsmancmd = WinRemoteClient(self.host_name, username, password)
-
-        install_wsb = 'powershell Add-WindowsFeature -Name Windows-Server-Backup -IncludeAllSubFeature:$true -Restart:$false'
-
-        LOG.info('Checking if the Windows Server Backup feature is present: ')
-
-        LOG.debug('Sending command %s', install_wsb)
-
+        LOG.debug('Sending command %s', cmd)
         try:
-            std_out, std_err, exit_code = wsmancmd.run_wsman_cmd(install_wsb)
+            std_out, std_err, exit_code = wsmancmd.run_wsman_cmd(cmd)
 
         except Exception as exc:
             LOG.exception(exc)
             raise exc
 
-        LOG.debug(std_out)
-        LOG.debug(std_err)
+        LOG.debug('Command std_out: %s', std_out)
+        LOG.debug('Command std_err: %s', std_err)
 
         ok = "True" in std_out
         self.assertEqual(ok, True)

@@ -13,7 +13,6 @@
 #    under the License.
 
 from tempest import config
-from tempest.common.utils.windows.remote_client import WinRemoteClient
 from tempest.lis import manager
 from tempest.openstack.common import log as logging
 from tempest.scenario import utils as test_utils
@@ -56,8 +55,6 @@ class TestLis(manager.ScenarioTest):
                     image=self.image_ref, flavor=self.flavor_ref
                 )
             )
-        self.host_name = ""
-        self.instance_name = ""
         self.run_ssh = CONF.compute.run_ssh and \
             self.image_utils.is_sshable_image(self.image_ref)
         self.ssh_user = self.image_utils.ssh_user(self.image_ref)
@@ -66,6 +63,15 @@ class TestLis(manager.ScenarioTest):
                       image=self.image_ref, flavor=self.flavor_ref,
                       ssh=self.run_ssh, ssh_user=self.ssh_user))
 
+    def create_flavor(self):
+         resp, flavor = self.client.create_flavor(flavor_name,
+                                                ram, vcpus,
+                                                 self.disk,
+                                                 flavor_id,
+                                                 ephemeral=self.ephemeral,
+                                                 swap=self.swap,
+                                                 rxtx=self.rxtx)
+        self.addCleanup(self.flavor_clean_up, flavor['id'])
     def add_keypair(self):
         self.keypair = self.create_keypair()
 
@@ -79,54 +85,43 @@ class TestLis(manager.ScenarioTest):
         self.instance = self.create_server(image=self.image_ref,
                                            flavor=self.flavor_ref,
                                            create_kwargs=create_kwargs)
-        self.instance_name = self.instance["OS-EXT-SRV-ATTR:instance_name"]
-        self.host_name = self.instance["OS-EXT-SRV-ATTR:hypervisor_hostname"]
 
-    def verify_integrated_shutdown_services(self):
-        username = CONF.host_credentials.host_user_name
-        password = CONF.host_credentials.host_password
-        base_cmd = 'powershell {command} -ComputerName ' + self.host_name + ' -VMName ' + self.instance_name + ' -Name Shutdown'
-        get_iss = base_cmd.format(command='Get-VMIntegrationService')
-        disable_iss = base_cmd.format(command='Disable-VMIntegrationService')
-        enable_iss = base_cmd.format(command='Enable-VMIntegrationService')
-
-        wsmancmd = WinRemoteClient(self.host_name, username, password)
-
-        std_out, std_err, exit_code = wsmancmd.run_wsman_cmd('powershell pwd')
-
-        LOG.debug('Executing %s', get_iss)
-        std_out, std_err, exit_code = wsmancmd.run_wsman_cmd(get_iss)
-        LOG.debug(std_out)
-        LOG.debug(std_err)
-
-        LOG.debug('Executing %s', disable_iss)
-        std_out, std_err, exit_code = wsmancmd.run_wsman_cmd(disable_iss)
-        LOG.debug(std_out)
-        LOG.debug(std_err)
-
-        LOG.debug('Executing %s', get_iss)
-        std_out, std_err, exit_code = wsmancmd.run_wsman_cmd(get_iss)
-        LOG.debug(std_out)
-        LOG.debug(std_err)
-
-        LOG.debug('Executing %s', enable_iss)
-        std_out, std_err, exit_code = wsmancmd.run_wsman_cmd(enable_iss)
-        LOG.debug(std_out)
-        LOG.debug(std_err)
-
-        LOG.debug('Executing %s', get_iss)
-        std_out, std_err, exit_code = wsmancmd.run_wsman_cmd(get_iss)
-        LOG.debug(std_out)
-        LOG.debug(std_err)
-
-        ok = "OK" in std_out
-
-        self.assertEqual(ok, True)
+    def verify_ssh(self):
+        if self.run_ssh:
+            # Obtain a floating IP
+            _, floating_ip = self.floating_ips_client.create_floating_ip()
+            self.addCleanup(self.delete_wrapper,
+                            self.floating_ips_client.delete_floating_ip,
+                            floating_ip['id'])
+            # Attach a floating IP
+            self.floating_ips_client.associate_floating_ip_to_server(
+                floating_ip['ip'], self.instance['id'])
+            # Check lis presence
+            try:
+                linux_client = self.get_remote_client(
+                    server_or_ip=floating_ip['ip'],
+                    username=self.image_utils.ssh_user(self.image_ref),
+                    private_key=self.keypair['private_key'])
+                output = linux_client.verify_lis_modules()
+                LOG.info('Found %s lis modules', output)
+                self.assertNotEqual(0, output)
+            except Exception:
+                LOG.exception('ssh to server failed')
+                self._log_console_output()
+                raise
 
     @test.services('compute', 'network')
-    def test_iss(self):
+    def test_lis_smp(self):
         self.add_keypair()
         self.security_group = self._create_security_group()
         self.boot_instance()
-        self.verify_integrated_shutdown_services()
+        self.verify_ssh()
+        server_id = self.instance['id']
+        resp, _ = self.servers_client.resize(server_id, self.flavor_ref_alt)
+        self.assertEqual(202, resp.status)
+        self.servers_client.wait_for_server_status(server_id, 'VERIFY_RESIZE')
+        self.servers_client.confirm_resize(server_id)
+        self.servers_client.wait_for_server_status(server_id, 'ACTIVE')
+
+        resp, body = self.client.list_migrations()
         self.servers_client.delete_server(self.instance['id'])
