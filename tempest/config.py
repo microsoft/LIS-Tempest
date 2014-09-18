@@ -261,7 +261,14 @@ HostGroup = [
                     "This is a required option"),
     cfg.StrOpt('host_password',
                help="Valid Hyper-V host credential "
-                    "This is a required option")
+                    "This is a required option"),
+    cfg.StrOpt('host_setupscripts_folder',
+               help="Hyper-V setupscripts folder "
+                    "This is a required option"),
+    cfg.StrOpt('host_vssbackup_drive',
+               help='Target drive for the Hyper-V VSS backups.'
+                    'This drive has to be different from the boot drive.'
+                    'This is a required option')
 ]
 
 compute_features_group = cfg.OptGroup(name='compute-feature-enabled',

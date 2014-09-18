@@ -97,6 +97,43 @@ class Client(object):
     def _is_timed_out(self, start_time):
         return (time.time() - self.timeout) > start_time
 
+    def sftp(self, source, destination):
+
+        try:
+            transport = paramiko.Transport((self.host, self.port))
+            transport.start_client()
+            self.agent_auth(transport, self.username)
+            sftp = transport.open_session()
+            sftp = paramiko.SFTPClient.from_transport(transport)
+            is_up_to_date = False
+
+            try:
+                sftp.mkdir(destination)
+            except IOError as e:
+                LOG.exception(e)
+
+            destination_file = destination + '/' + os.path.basename(source)
+            try:
+                if sftp.stat(destination):
+                    source_data = open(source, "rb").read()
+                    destination_data = sftp.open(destination_file).read()
+                    md1 = md5.new(source_data).digest()
+                    md2 = md5.new(destination_data).digest()
+                    if md1 == md2:
+                        is_up_to_date = True
+            except:
+                pass
+
+            if not is_up_to_date:
+                sftp.put(source, destination_file)
+                LOG.info("Successfuly copied over %s to %s", source, destination)
+        except Exception as e:
+            return '*** Caught exception: %s: %s' % (e.__class__, e)
+            try:
+                transport.close()
+            except:
+                pass
+
     def exec_command(self, cmd):
         """
         Execute the specified command on the server.

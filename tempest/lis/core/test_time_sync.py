@@ -20,7 +20,7 @@ from tempest.lis import manager
 from tempest.openstack.common import log as logging
 from tempest.scenario import utils as test_utils
 from tempest import test
-
+from time import time
 CONF = config.CONF
 
 LOG = logging.getLogger(__name__)
@@ -66,6 +66,9 @@ class TestLis(manager.ScenarioTest):
                       image=self.image_ref, flavor=self.flavor_ref,
                       ssh=self.run_ssh, ssh_user=self.ssh_user))
 
+        self.host_username = CONF.host_credentials.host_user_name
+        self.host_password = CONF.host_credentials.host_password
+
     def _wait_for_server_status(self, status):
         instance_id = self.instance['id']
         # Raise on error defaults to True, which is consistent with the
@@ -88,6 +91,16 @@ class TestLis(manager.ScenarioTest):
 
         self.instance_name = self.instance["OS-EXT-SRV-ATTR:instance_name"]
         self.host_name = self.instance["OS-EXT-SRV-ATTR:hypervisor_hostname"]
+        self._initiate_wsman(self.host_name)
+
+    def _initiate_wsman(self, host_name):
+        try:
+            self.wsmancmd = WinRemoteClient(
+                host_name, self.host_username, self.host_password)
+
+        except Exception as exc:
+            LOG.exception(exc)
+            raise exc
 
     def nova_reboot(self):
         self.servers_client.reboot(self.instance['id'], 'SOFT')
@@ -111,7 +124,7 @@ class TestLis(manager.ScenarioTest):
                 private_key=self.keypair['private_key'])
 
             unix_time = linux_client.get_unix_time()
-            LOG.info('VM unix time', unix_time)
+            LOG.debug('VM unix time %s ', unix_time)
         except Exception:
             LOG.exception('ssh to server failed')
             self._log_console_output()
@@ -119,17 +132,10 @@ class TestLis(manager.ScenarioTest):
         return unix_time
 
     def get_host_time(self):
-        """ use actual credentials from conf file"""
-        username = CONF.host_credentials.host_user_name
-        password = CONF.host_credentials.host_password
-
-        """Get host time"""
-        cmd = 'powershell -Command ((Get-Date -UFormat %s) -Replace(\"[,\\.]\\d*\", \"\"))'
-
-        wsmancmd = WinRemoteClient(self.host_name, username, password)
+        cmd = 'powershell " [int]([DateTime]::UtcNow - $(new-object DateTime 1970,1,1,0,0,0,([DateTimeKind]::Utc))).TotalSeconds "'
         LOG.debug('Sending command %s', cmd)
         try:
-            std_out, std_err, exit_code = wsmancmd.run_wsman_cmd(cmd)
+            std_out, std_err, exit_code = self.wsmancmd.run_wsman_cmd(cmd)
 
         except Exception as exc:
             LOG.exception(exc)
@@ -148,5 +154,10 @@ class TestLis(manager.ScenarioTest):
         self.nova_floating_ip_create()
         self.nova_floating_ip_add()
         vm_time = self.get_vm_time()
+        t0 = time()
         host_time = self.get_host_time()
+        t1 = time()
+        exec_time = t1 - t0
+        LOG.debug('Duration of get_host_time %s', exec_time)
+        self.assertTrue(abs(vm_time - host_time) - exec_time < 7)
         self.servers_client.delete_server(self.instance['id'])

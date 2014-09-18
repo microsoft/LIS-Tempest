@@ -1,3 +1,5 @@
+# Copyright 2014 Cloudbase Solutions Srl
+#
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
 #    not use this file except in compliance with the License. You may obtain
 #    a copy of the License at
@@ -46,6 +48,10 @@ class RemoteClient():
 
     def exec_command(self, cmd):
         return self.ssh_client.exec_command(cmd)
+
+    def copy_over(self, source, destination):
+        output = self.ssh_client.sftp(source, destination)
+        return output
 
     def validate_authentication(self):
         """Validate ssh connection and authentication
@@ -119,9 +125,26 @@ class RemoteClient():
         output = self.exec_command(command)
         return int(output)
 
-    def verify_timesync_ntp(self):
-        """TODO: actually implement"""
-        command = 'lsmod | grep hv_ | wc -l'
+    def create_file(self, file_name):
+        cmd = 'echo abc > %s' % file_name
+        return self.exec_command(cmd)
+
+    def delete_file(self, file_name):
+        cmd = 'rm -f %s' % file_name
+        output = self.exec_command(cmd)
+        return (output)
+
+    def verify_deamon(self, deamon):
+        cmd = 'ps cax | grep %s' % deamon
+        output = self.exec_command(cmd)
+        return (output)
+
+    def verify_file(self, file_name):
+        cmd = 'cat %s' % file_name
+        return self.exec_command(cmd)
+
+    def get_unix_time(self):
+        command = 'date +%s'
         output = self.exec_command(command)
         return int(output)
 

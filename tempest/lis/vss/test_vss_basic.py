@@ -61,6 +61,12 @@ class TestLis(manager.ScenarioTest):
         self.run_ssh = CONF.compute.run_ssh and \
             self.image_utils.is_sshable_image(self.image_ref)
         self.ssh_user = self.image_utils.ssh_user(self.image_ref)
+        self.filename = '~/testfile.txt'
+        self.deamon = 'hv_vss_daemon'
+        self.username = CONF.host_credentials.host_user_name
+        self.passwd = CONF.host_credentials.host_password
+        self.scriptfolder = CONF.host_credentials.host_setupscripts_folder
+        self.targetdrive = CONF.host_credentials.host_vssbackup_drive
         LOG.debug('Starting test for i:{image}, f:{flavor}. '
                   'Run ssh: {ssh}, user: {ssh_user}'.format(
                       image=self.image_ref, flavor=self.flavor_ref,
@@ -82,19 +88,56 @@ class TestLis(manager.ScenarioTest):
         self.instance_name = self.instance["OS-EXT-SRV-ATTR:instance_name"]
         self.host_name = self.instance["OS-EXT-SRV-ATTR:hypervisor_hostname"]
 
-   
+    def nova_floating_ip_create(self):
+        _, self.floating_ip = self.floating_ips_client.create_floating_ip()
+        self.addCleanup(self.delete_wrapper,
+                        self.floating_ips_client.delete_floating_ip,
+                        self.floating_ip['id'])
 
+    def nova_floating_ip_add(self):
+        self.floating_ips_client.associate_floating_ip_to_server(
+            self.floating_ip['ip'], self.instance['id'])
 
+    def check_vss_deamon(self):
+        """ Check if hv_vss_deamon runs on the vm """
+        try:
+            linux_client = self.get_remote_client(
+                server_or_ip=self.floating_ip['ip'],
+                username=self.image_utils.ssh_user(self.image_ref),
+                private_key=self.keypair['private_key'])
+            linux_client.create_file(self.filename)
+            output = linux_client.verify_deamon(self.deamon)
+            LOG.info('VSS Deamon is running ', output)
+            self.assertIsNotNone(output)
+        except Exception:
+            LOG.exception('VSS Deamon ' + self.deamon + ' is not running!')
+            self._log_console_output()
+            raise
 
+    def create_file(self):
+        """ Create a file on the vm """
+        try:
+            linux_client = self.get_remote_client(
+                server_or_ip=self.floating_ip['ip'],
+                username=self.image_utils.ssh_user(self.image_ref),
+                private_key=self.keypair['private_key'])
+            linux_client.create_file(self.filename)
+            output = linux_client.verify_file(self.filename)
+            LOG.info('Created file %s' % output)
+            self.assertIsNotNone(output)
+        except Exception:
+            LOG.exception('Creating file ' + self.filename + ' failed!')
+            self._log_console_output()
+            raise
 
+    def backup_vm(self):
+        """Take a VSS live backup of the VM"""
+        cmd = 'powershell -Command ' + self.scriptfolder
+        cmd += 'setupscripts\\vss_backup.ps1 -vmName ' + self.instance_name
+        cmd += ' -hvServer ' + self.host_name
+        cmd += ' -targetDrive ' + self.targetdrive
 
-   def backup_vm(self):
-        """ use actual credentials from conf file"""
-        username = CONF.host_credentials.host_user_name
-        password = CONF.host_credentials.host_password
-        cmd = 'powershell -Command ./$home/vss_backup.ps1 -ComputerName ' + self.host_name +' -VMName '+  self.instance_name +' -Name Heartbeat).Enabled'
-
-        wsmancmd = WinRemoteClient(self.host_name, username, password)
+        wsmancmd = WinRemoteClient(self.host_name, self.username, self.passwd)
         LOG.debug('Sending command %s', cmd)
         try:
             std_out, std_err, exit_code = wsmancmd.run_wsman_cmd(cmd)
@@ -109,12 +152,70 @@ class TestLis(manager.ScenarioTest):
         ok = "True" in std_out
         self.assertEqual(ok, True)
 
-    
+    def delete_file(self):
+        """ Delete the file from the vm """
+        try:
+            linux_client = self.get_remote_client(
+                server_or_ip=self.floating_ip['ip'],
+                username=self.image_utils.ssh_user(self.image_ref),
+                private_key=self.keypair['private_key'])
+            linux_client.delete_file(self.filename)
+            LOG.info('Deleting file from the the VM.')
+        except Exception:
+            LOG.exception('Cannot delete ' + self.filename)
+            self._log_console_output()
+            raise
+
+    def restore_vm(self):
+        """Restore the VM"""
+        cmd = 'powershell -Command ' + self.scriptfolder
+        cmd += 'setupscripts\\vss_restore.ps1 -vmName ' + self.instance_name
+        cmd += ' -hvServer ' + self.host_name
+        cmd += ' -targetDrive ' + self.targetdrive
+
+        wsmancmd = WinRemoteClient(self.host_name, self.username, self.passwd)
+        LOG.debug('Sending command %s', cmd)
+        try:
+            std_out, std_err, exit_code = wsmancmd.run_wsman_cmd(cmd)
+
+        except Exception as exc:
+            LOG.exception(exc)
+            raise exc
+
+        LOG.debug('Command std_out: %s', std_out)
+        LOG.debug('Command std_err: %s', std_err)
+
+        ok = "True" in std_out
+        import pdb
+        pdb.set_trace()
+        self.assertEqual(ok, True)
+
+    def verify_file(self):
+        """ Verify if the file exists on the vm """
+        try:
+            linux_client = self.get_remote_client(
+                server_or_ip=self.floating_ip['ip'],
+                username=self.image_utils.ssh_user(self.image_ref),
+                private_key=self.keypair['private_key'])
+            output = linux_client.verify_file(self.filename)
+            LOG.info('File is present on the VM. ', output)
+            self.assertIsNotNone(output)
+        except Exception:
+            LOG.exception('File ' + self.filename + 'is NOT on the VM!')
+            self._log_console_output()
+            raise
+
     @test.services('compute', 'network')
-    def test_server_lis_heartbeat(self):
+    def test_server_lis_vss_basic(self):
         self.add_keypair()
         self.security_group = self._create_security_group()
         self.boot_instance()
-        self.verify_wsb()
-        self.remove_all_backups()
+        self.nova_floating_ip_create()
+        self.nova_floating_ip_add()
+        self.check_vss_deamon()
+        self.create_file()
+        self.backup_vm()
+        self.delete_file()
+        self.restore_vm()
+        self.verify_file()
         self.servers_client.delete_server(self.instance['id'])
