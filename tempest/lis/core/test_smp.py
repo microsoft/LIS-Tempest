@@ -65,14 +65,15 @@ class TestLis(manager.ScenarioTest):
                       ssh=self.run_ssh, ssh_user=self.ssh_user))
 
     def create_flavor(self):
-         resp, flavor = self.client.create_flavor(flavor_name,
-                                                ram, vcpus,
-                                                 self.disk,
-                                                 flavor_id,
-                                                 ephemeral=self.ephemeral,
-                                                 swap=self.swap,
-                                                 rxtx=self.rxtx)
+        resp, flavor = self.client.create_flavor(flavor_name,
+                                                  ram, vcpus,
+                                                  self.disk,
+                                                  flavor_id,
+                                                  ephemeral=self.ephemeral,
+                                                  swap=self.swap,
+                                                  rxtx=self.rxtx)
         self.addCleanup(self.flavor_clean_up, flavor['id'])
+
     def add_keypair(self):
         self.keypair = self.create_keypair()
 
@@ -87,20 +88,24 @@ class TestLis(manager.ScenarioTest):
                                            flavor=self.flavor_ref,
                                            create_kwargs=create_kwargs)
 
+    def nova_floating_ip_create(self):
+        _, self.floating_ip = self.floating_ips_client.create_floating_ip()
+        self.addCleanup(self.delete_wrapper,
+                        self.floating_ips_client.delete_floating_ip,
+                        self.floating_ip['id'])
+
+    def nova_floating_ip_add(self):
+        self.floating_ips_client.associate_floating_ip_to_server(
+            self.floating_ip['ip'], self.instance['id'])
+
     def verify_ssh(self):
         if self.run_ssh:
-            # Obtain a floating IP
-            _, floating_ip = self.floating_ips_client.create_floating_ip()
-            self.addCleanup(self.delete_wrapper,
-                            self.floating_ips_client.delete_floating_ip,
-                            floating_ip['id'])
-            # Attach a floating IP
-            self.floating_ips_client.associate_floating_ip_to_server(
-                floating_ip['ip'], self.instance['id'])
             # Check lis presence
             try:
+                import pdb
+                pdb.set_trace()
                 linux_client = self.get_remote_client(
-                    server_or_ip=floating_ip['ip'],
+                    server_or_ip=self.floating_ip['ip'],
                     username=self.image_utils.ssh_user(self.image_ref),
                     private_key=self.keypair['private_key'])
                 output = linux_client.verify_lis_modules()
@@ -116,13 +121,17 @@ class TestLis(manager.ScenarioTest):
         self.add_keypair()
         self.security_group = self._create_security_group()
         self.boot_instance()
+        self.nova_floating_ip_create()
+        self.nova_floating_ip_add()
         self.verify_ssh()
         server_id = self.instance['id']
-        resp, _ = self.servers_client.resize(server_id, self.flavor_ref_alt)
+        resp, _ = self.servers_client.resize(server_id, '2')
         self.assertEqual(202, resp.status)
         self.servers_client.wait_for_server_status(server_id, 'VERIFY_RESIZE')
         self.servers_client.confirm_resize(server_id)
         self.servers_client.wait_for_server_status(server_id, 'ACTIVE')
+        # import pdb
+        # pdb.set_trace()
+        self.verify_ssh()
 
-        resp, body = self.client.list_migrations()
         self.servers_client.delete_server(self.instance['id'])
