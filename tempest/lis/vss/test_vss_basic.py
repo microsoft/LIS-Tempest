@@ -107,7 +107,7 @@ class TestLis(manager.ScenarioTest):
                 private_key=self.keypair['private_key'])
             linux_client.create_file(self.filename)
             output = linux_client.verify_deamon(self.deamon)
-            LOG.info('VSS Deamon is running ', output)
+            LOG.info('VSS Deamon is running ', str(output))
             self.assertIsNotNone(output)
         except Exception:
             LOG.exception('VSS Deamon ' + self.deamon + ' is not running!')
@@ -146,7 +146,7 @@ class TestLis(manager.ScenarioTest):
             LOG.exception(exc)
             raise exc
 
-        LOG.debug('Command std_out: %s', std_out)
+        LOG.info('VSS backup:\nstd_out: %s', std_out)
         LOG.debug('Command std_err: %s', std_err)
 
         ok = "True" in std_out
@@ -175,19 +175,18 @@ class TestLis(manager.ScenarioTest):
 
         wsmancmd = WinRemoteClient(self.host_name, self.username, self.passwd)
         LOG.debug('Sending command %s', cmd)
+        # import pdb
+        # pdb.set_trace()
         try:
             std_out, std_err, exit_code = wsmancmd.run_wsman_cmd(cmd)
-
         except Exception as exc:
             LOG.exception(exc)
             raise exc
 
-        LOG.debug('Command std_out: %s', std_out)
+        LOG.info('VSS restore:\nstd_out: %s', std_out)
         LOG.debug('Command std_err: %s', std_err)
 
-        ok = "True" in std_out
-        import pdb
-        pdb.set_trace()
+        ok = exit_code == 0
         self.assertEqual(ok, True)
 
     def verify_file(self):
