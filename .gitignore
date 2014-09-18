@@ -17,9 +17,4 @@ build
 .coverage*
 !.coveragerc
 cover/
-test_heartbeat.py
-test_iss.py
-test_lis_presence.py
-test_ntpd.py
-tempest.conf
 .com.apple.timemachine.supported
