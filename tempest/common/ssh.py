@@ -15,6 +15,7 @@
 
 
 import cStringIO
+import os
 import select
 import socket
 import time
@@ -39,6 +40,7 @@ class Client(object):
     def __init__(self, host, username, password=None, timeout=300, pkey=None,
                  channel_timeout=10, look_for_keys=False, key_filename=None):
         self.host = host
+        self.port = 22
         self.username = username
         self.password = password
         if isinstance(pkey, six.string_types):
@@ -126,13 +128,28 @@ class Client(object):
 
             if not is_up_to_date:
                 sftp.put(source, destination_file)
-                LOG.info("Successfuly copied over %s to %s", source, destination)
+                LOG.info(
+                    "Successfuly copied over %s to %s", source, destination)
         except Exception as e:
             return '*** Caught exception: %s: %s' % (e.__class__, e)
             try:
                 transport.close()
             except:
                 pass
+
+    def agent_auth(self, transport, username):
+
+        agent = paramiko.Agent()
+        agent_keys = agent.get_keys() + (self.pkey,)
+        if len(agent_keys) == 0:
+            return
+
+        for key in agent_keys:
+            try:
+                transport.auth_publickey(username, key)
+                return
+            except paramiko.SSHException, e:
+                raise e
 
     def exec_command(self, cmd):
         """

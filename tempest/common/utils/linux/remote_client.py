@@ -125,6 +125,11 @@ class RemoteClient():
         output = self.exec_command(command)
         return int(output)
 
+    def get_cpu_count(self):
+        command = 'cat /proc/cpuinfo | grep processor | wc -l'
+        output = self.exec_command(command)
+        return int(output)
+
     def create_file(self, file_name):
         cmd = 'echo abc > %s' % file_name
         return self.exec_command(cmd)
