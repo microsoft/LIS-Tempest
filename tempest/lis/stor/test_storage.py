@@ -111,7 +111,7 @@ class TestLis(manager.ScenarioTest):
     def add_disk(self, disk_type, controller_type, controller_id, lun, vhd_type, sector_size):
         """Attachk Disk to VM"""
         cmd = 'powershell ' + self.scriptfolder
-        cmd += 'setupscripts\\attach-vhdx.ps1 -vmName ' + self.instance_name
+        cmd += 'setupscripts\\attach-disk.ps1 -vmName ' + self.instance_name
         cmd += ' -hvServer ' + self.host_name
         cmd += ' -diskType ' + disk_type
         cmd += ' -controllerType ' + controller_type
