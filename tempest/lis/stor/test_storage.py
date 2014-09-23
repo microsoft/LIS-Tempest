@@ -61,12 +61,10 @@ class TestLis(manager.ScenarioTest):
         self.run_ssh = CONF.compute.run_ssh and \
             self.image_utils.is_sshable_image(self.image_ref)
         self.ssh_user = self.image_utils.ssh_user(self.image_ref)
-        self.filename = '~/testfile.txt'
-        self.deamon = 'hv_vss_daemon'
+
         self.host_username = CONF.host_credentials.host_user_name
         self.host_password = CONF.host_credentials.host_password
         self.scriptfolder = CONF.host_credentials.host_setupscripts_folder
-        self.targetdrive = CONF.host_credentials.host_vssbackup_drive
         LOG.debug('Starting test for i:{image}, f:{flavor}. '
                   'Run ssh: {ssh}, user: {ssh_user}'.format(
                       image=self.image_ref, flavor=self.flavor_ref,
@@ -152,7 +150,7 @@ class TestLis(manager.ScenarioTest):
             raise
 
     @test.services('compute', 'network')
-    def test_storage_vhdx_dynamic_ide(self):
+    def test_storage_vhd_fixed_ide(self):
         self.add_keypair()
         self.security_group = self._create_security_group()
         self.boot_instance()
@@ -161,7 +159,23 @@ class TestLis(manager.ScenarioTest):
         server_id = self.instance['id']
         self.servers_client.stop(server_id)
         self.servers_client.wait_for_server_status(server_id, 'SHUTOFF')
-        self.add_disk('vhdx', "SCSI", 0, 0, "Dynamic", 512)
+        self.add_disk('vhd', "IDE", 1, 1, "Fixed", 512)
+        self.servers_client.start(server_id)
+        self.servers_client.wait_for_server_status(server_id, 'ACTIVE')
+        self.format_disk(1)
+        self.servers_client.delete_server(self.instance['id'])
+
+    @test.services('compute', 'network')
+    def test_storage_vhd_fixed_scsi(self):
+        self.add_keypair()
+        self.security_group = self._create_security_group()
+        self.boot_instance()
+        self.nova_floating_ip_create()
+        self.nova_floating_ip_add()
+        server_id = self.instance['id']
+        self.servers_client.stop(server_id)
+        self.servers_client.wait_for_server_status(server_id, 'SHUTOFF')
+        self.add_disk('vhd', 'SCSI', 0, 1, 'Fixed', 512)
         self.servers_client.start(server_id)
         self.servers_client.wait_for_server_status(server_id, 'ACTIVE')
         self.format_disk(1)
@@ -177,14 +191,14 @@ class TestLis(manager.ScenarioTest):
         server_id = self.instance['id']
         self.servers_client.stop(server_id)
         self.servers_client.wait_for_server_status(server_id, 'SHUTOFF')
-        self.add_disk('vhdx', 'SCSI', 0, 0, 'Fixed', 512)
+        self.add_disk('vhdx', 'IDE', 1, 1, 'Fixed', 512)
         self.servers_client.start(server_id)
         self.servers_client.wait_for_server_status(server_id, 'ACTIVE')
         self.format_disk(1)
         self.servers_client.delete_server(self.instance['id'])
 
     @test.services('compute', 'network')
-    def test_storage_vhd_fixed_ide(self):
+    def test_storage_vhdx_fixed_scsi(self):
         self.add_keypair()
         self.security_group = self._create_security_group()
         self.boot_instance()
@@ -193,23 +207,7 @@ class TestLis(manager.ScenarioTest):
         server_id = self.instance['id']
         self.servers_client.stop(server_id)
         self.servers_client.wait_for_server_status(server_id, 'SHUTOFF')
-        self.add_disk('vhd', 'SCSI', 0, 0, 'Fixed', 512)
-        self.servers_client.start(server_id)
-        self.servers_client.wait_for_server_status(server_id, 'ACTIVE')
-        self.format_disk(1)
-        self.servers_client.delete_server(self.instance['id'])
-
-    @test.services('compute', 'network')
-    def test_storage_vhd_dynamic_ide(self):
-        self.add_keypair()
-        self.security_group = self._create_security_group()
-        self.boot_instance()
-        self.nova_floating_ip_create()
-        self.nova_floating_ip_add()
-        server_id = self.instance['id']
-        self.servers_client.stop(server_id)
-        self.servers_client.wait_for_server_status(server_id, 'SHUTOFF')
-        self.add_disk('vhd', 'SCSI', 0, 0, 'Dynamic', 512)
+        self.add_disk('vhdx', 'SCSI', 0, 1, 'Fixed', 512)
         self.servers_client.start(server_id)
         self.servers_client.wait_for_server_status(server_id, 'ACTIVE')
         self.format_disk(1)
