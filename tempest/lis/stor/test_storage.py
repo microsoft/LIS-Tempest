@@ -61,7 +61,6 @@ class TestLis(manager.ScenarioTest):
         self.run_ssh = CONF.compute.run_ssh and \
             self.image_utils.is_sshable_image(self.image_ref)
         self.ssh_user = self.image_utils.ssh_user(self.image_ref)
-
         self.host_username = CONF.host_credentials.host_user_name
         self.host_password = CONF.host_credentials.host_password
         self.scriptfolder = CONF.host_credentials.host_setupscripts_folder
@@ -136,19 +135,27 @@ class TestLis(manager.ScenarioTest):
                 server_or_ip=self.floating_ip['ip'],
                 username=self.image_utils.ssh_user(self.image_ref),
                 private_key=self.keypair['private_key'])
-            script='STOR_Lis_Disk.sh'
-            MY_PATH = os.path.abspath(os.path.normpath(os.path.dirname(__file__)))
-            copy_file = linux_client.copy_over(MY_PATH + '/scripts/' + script, '/root/')
+            script = 'STOR_Lis_Disk.sh'
+            MY_PATH = os.path.abspath(
+                os.path.normpath(os.path.dirname(__file__)))
+            copy_file = linux_client.copy_over(
+                MY_PATH + '/scripts/' + script, '/root/')
+            output = linux_client.ssh_client.exec_command(
+                'cd /root/; dos2unix ' + script)
+            output = linux_client.ssh_client.exec_command('chmod +x ' + script)
+            cmd = './{script} {disk_count} {fs}'.format(
+                script=script,
+                disk_count=expected_disk_count,
+                fs='ext3')
+            output = linux_client.ssh_client.exec_command(cmd)
 
-            output = linux_client.ssh_client.exec_command('cd /root/; dos2unix ' + script)
-            output = linux_client.ssh_client.exec_command('chmod +x ' + script )
-            output = linux_client.ssh_client.exec_command('./' + script + ' 1 ext3')
-
-        except Exception:
-            LOG.exception('Error while formatting disk %s', output)
+        except Exception as exc:
+            LOG.exception(exc)
             self._log_console_output()
-            raise
+            raise exc
 
+
+class TestVHD(TestLis):
     @test.services('compute', 'network')
     def test_storage_vhd_fixed_ide(self):
         self.add_keypair()
@@ -175,12 +182,14 @@ class TestLis(manager.ScenarioTest):
         server_id = self.instance['id']
         self.servers_client.stop(server_id)
         self.servers_client.wait_for_server_status(server_id, 'SHUTOFF')
-        self.add_disk('vhd', 'SCSI', 0, 1, 'Fixed', 512)
+        self.add_disk('vhd', 'SCSI', 1, 1, 'Fixed', 512)
         self.servers_client.start(server_id)
         self.servers_client.wait_for_server_status(server_id, 'ACTIVE')
         self.format_disk(1)
         self.servers_client.delete_server(self.instance['id'])
 
+
+class TestVHDx(TestLis):
     @test.services('compute', 'network')
     def test_storage_vhdx_fixed_ide(self):
         self.add_keypair()
