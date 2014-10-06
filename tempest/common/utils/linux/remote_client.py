@@ -27,6 +27,7 @@ CONF = config.CONF
 class RemoteClient():
 
     # NOTE(afazekas): It should always get an address instead of server
+
     def __init__(self, server, username, password=None, pkey=None):
         ssh_timeout = CONF.compute.ssh_timeout
         network = CONF.compute.network_for_ssh
@@ -153,6 +154,7 @@ class RemoteClient():
         output = self.exec_command(command)
         return int(output)
 
-    def verify_external_ping(self, destination_ip):
-        cmd = "ping -c 10 {destination_ip}".format(destination_ip=destination_ip)
+    def verify_ping(self, destination_ip, dev='eth0'):
+        cmd = "ping -I {dev} -c 10 {destination_ip}".format(
+            dev=dev, destination_ip=destination_ip)
         return self.exec_command(cmd)
