@@ -11,8 +11,10 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
+import netaddr
 import os
 from tempest import config
+from tempest.common.utils import data_utils
 from tempest.common.utils.windows.remote_client import WinRemoteClient
 from tempest.lis import manager
 from tempest.openstack.common import log as logging
@@ -65,6 +67,7 @@ class Network(manager.ScenarioTest):
         self.host_username = CONF.host_credentials.host_user_name
         self.host_password = CONF.host_credentials.host_password
         self.scriptfolder = CONF.host_credentials.host_setupscripts_folder
+        self.lis_private_network = CONF.lis.private_network
 
         LOG.debug('Starting test for i:{image}, f:{flavor}. '
                   'Run ssh: {ssh}, user: {ssh_user}'.format(
@@ -227,8 +230,8 @@ class Bridge(Network):
 
         LOG.debug('Sending command %s', cmd)
         try:
-            std_out, std_err, exit_code = self.wsmancmd.run_wsman_cmd(cmd)
 
+            std_out, std_err, exit_code = self.wsmancmd.run_wsman_cmd(cmd)
         except Exception as exc:
             LOG.exception(exc)
             raise exc
@@ -237,32 +240,52 @@ class Bridge(Network):
         LOG.debug('Command std_err: %s', std_err)
         self.assertFalse(exit_code != 0)
 
+    def refresh_repo(self):
+        cmd = 'powershell cd ' + self.scriptfolder
+        cmd += '; git pull'
+        self.send_command(cmd)
+
     def configure_switches(self):
         """Create/attach vswitches to VMs"""
-
+        pr_switch = data_utils.rand_name(self.__class__.__name__)
         cmd = 'powershell ' + self.scriptfolder
         cmd += 'setupscripts\\create-private-vSwitch.ps1'
+        cmd += ' -baseName ' + pr_switch
         self.send_command(cmd)
+        self.addCleanup(self.delete_temp_switches, pr_switch)
 
         cmd = 'powershell ' + self.scriptfolder
         cmd += 'setupscripts\\bridge_setup.ps1'
+        cmd += ' -baseName ' + pr_switch
         cmd += ' -vm1 ' + self.vm1['instance_name']
         cmd += ' -vm2 ' + self.vm2['instance_name']
         cmd += ' -vm3 ' + self.vm3['instance_name']
         self.send_command(cmd)
 
+    def delete_temp_switches(self, pr_switch):
+        """Create/attach vswitches to VMs"""
+        cmd = 'powershell ' + self.scriptfolder
+        cmd += 'setupscripts\\delete-private-vSwitch.ps1'
+        cmd += ' -baseName ' + pr_switch
+
+        self.send_command(cmd)
+
     def setup_bridge_env(self):
-        """TODO: move these out/get device dynamically"""
-        self.vm1['static_ip'] = '192.168.162.2'
+        """TODO: get device dynamically based on macaddr"""
+        network = netaddr.IPNetwork(self.lis_private_network)
+        broadcast = netaddr.IPAddress(network.first + 1)
+        prefix = network.prefixlen
+
+        self.vm1['static_ip'] = broadcast + 1
         self.vm1['static_device'] = 'eth1'
-        self.vm3['static_ip'] = '192.168.162.12'
+        self.vm3['static_ip'] = broadcast + 2
         self.vm3['static_device'] = 'eth1'
 
         self._set_interfaces(
-            self.vm1, self.vm1['static_ip'], '24', self.vm1['static_device'])
+            self.vm1, self.vm1['static_ip'], prefix, self.vm1['static_device'])
         self._set_interfaces(
-            self.vm3, self.vm3['static_ip'], '24', self.vm3['static_device'])
-        self._set_bridge(self.vm2, '192.168.162.22', '24', 'eth1', 'eth2')
+            self.vm3, self.vm3['static_ip'], prefix, self.vm3['static_device'])
+        self._set_bridge(self.vm2, broadcast + 3, prefix, 'eth1', 'eth2')
 
     def _set_bridge(self, vm, static_ip, netmask, dev1, dev2):
         try:
@@ -288,6 +311,9 @@ class Bridge(Network):
             output = linux_client.ssh_client.exec_command(cmd)
 
         except Exception as exc:
+            output = linux_client.ssh_client.exec_command(
+                'cat ~/{script}.log'.format(script=script))
+            LOG.exception('Inside logs for failure: %s' % output)
             LOG.exception(exc)
             self._log_console_output()
             raise exc
@@ -315,6 +341,9 @@ class Bridge(Network):
             output = linux_client.ssh_client.exec_command(cmd)
 
         except Exception as exc:
+            output = linux_client.ssh_client.exec_command(
+                'cat ~/{script}.log'.format(script=script))
+            LOG.exception('Inside logs for failure: %s' % output)
             LOG.exception(exc)
             self._log_console_output()
             raise exc
@@ -365,6 +394,7 @@ class Bridge(Network):
         self.security_group = self._create_security_group()
         self.boot_instances(3)
         self._initiate_wsman(self.host_name)
+        self.refresh_repo()
         self.stop_instances()
         self.vm1 = self.instances[0]
         self.vm2 = self.instances[1]

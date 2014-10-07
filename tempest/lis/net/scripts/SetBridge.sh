@@ -5,7 +5,7 @@
 # if no parameter is given outside of IP and Netmask, all interfaces will be added (except lo)
 LogMsg()
 {
-	echo $(date "+%a %b %d %T %Y") : "${1}"
+	echo $(date "+%a %b %d %T %Y") : "${1}"  >> ~/$0.log
 }
 if [ $# -lt 2 ]; then
 	LogMsg "SetupBridge needs at least 2 parameters"

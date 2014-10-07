@@ -253,7 +253,7 @@ ComputeGroup = [
 ]
 
 host_group = cfg.OptGroup(name='host_credentials',
-                             title='Hyper-V Host credentials')
+                          title='Hyper-V Host credentials')
 
 HostGroup = [
     cfg.StrOpt('host_user_name',
@@ -269,6 +269,16 @@ HostGroup = [
                help='Target drive for the Hyper-V VSS backups.'
                     'This drive has to be different from the boot drive.'
                     'This is a required option')
+]
+
+lis_group = cfg.OptGroup(name='lis',
+                         title='LIS test specific info')
+
+LisGroup = [
+    cfg.StrOpt('private_network',
+               help='Valid private network needed by some test cases'
+                    'This has to not overlap with existing openstack networks'
+                    "This is a required option")
 ]
 
 compute_features_group = cfg.OptGroup(name='compute-feature-enabled',
@@ -1044,6 +1054,7 @@ def register_opts():
     register_opt_group(cfg.CONF, auth_group, AuthGroup)
     register_opt_group(cfg.CONF, compute_group, ComputeGroup)
     register_opt_group(cfg.CONF, host_group, HostGroup)
+    register_opt_group(cfg.CONF, lis_group, LisGroup)
     register_opt_group(cfg.CONF, compute_features_group,
                        ComputeFeaturesGroup)
     register_opt_group(cfg.CONF, identity_group, IdentityGroup)
@@ -1082,6 +1093,7 @@ def register_opts():
 
 # this should never be called outside of this class
 class TempestConfigPrivate(object):
+
     """Provides OpenStack configuration information."""
 
     DEFAULT_CONFIG_DIR = os.path.join(
