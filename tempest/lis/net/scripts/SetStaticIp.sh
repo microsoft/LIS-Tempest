@@ -6,7 +6,7 @@
 # $3 == interface
 LogMsg()
 {
-	echo $(date "+%a %b %d %T %Y") : "${1}"
+	echo $(date "+%a %b %d %T %Y") : "${1}" >> ~/$0.log
 }
 
 if [ 2 -gt $# ]; then
@@ -38,6 +38,7 @@ if [ "$__netmask" -ge 32 -o "$__netmask" -le 0 ]; then
 	exit 4
 fi
 
+LogMsg "Setting up static ip for dev $__interface"
 ip link set "$__interface" down
 ip addr flush "$__interface"
 ip addr add "$__ip"/"$__netmask" dev "$__interface"
@@ -62,6 +63,5 @@ if [ "$__IP_ADDRESS" != "$__ip" ]; then
 	LogMsg "New address $__IP_ADDRESS differs from static ip $__ip on interface $__interface"
 	exit 6
 fi
-
 # OK
 exit 0
