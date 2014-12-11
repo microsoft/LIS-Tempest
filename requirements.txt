@@ -25,3 +25,4 @@ iso8601>=0.1.9
 fixtures>=0.3.14
 testscenarios>=0.4
 pywinrm>=0.0.3
+junitxml>=0.7
