@@ -20,26 +20,28 @@ import sys
 
 from winrm import protocol
 
+
 class WinRemoteClient(object):
 
     def __init__(self, hostname, username, password):
 
-        self.hostname = 'https://' + hostname + ':5986/wsman';
-        self.username = username;
-        self.password = password;
+        self.hostname = 'https://' + hostname + ':5986/wsman'
+        self.username = username
+        self.password = password
 
     def run_wsman_cmd(self, cmd):
         protocol.Protocol.DEFAULT_TIMEOUT = "PT3600S"
         try:
             p = protocol.Protocol(endpoint=self.hostname,
-                                      transport='plaintext',
-                                      username=self.username,
-                                      password=self.password)
+                                  transport='plaintext',
+                                  username=self.username,
+                                  password=self.password)
 
             shell_id = p.open_shell()
 
-            command_id = p.run_command(shell_id,cmd)
-            std_out, std_err, status_code = p.get_command_output(shell_id, command_id)
+            command_id = p.run_command(shell_id, cmd)
+            std_out, std_err, status_code = p.get_command_output(
+                shell_id, command_id)
 
             p.cleanup_command(shell_id, command_id)
             p.close_shell(shell_id)
@@ -60,7 +62,8 @@ class WinRemoteClient(object):
         shell_id = p.open_shell()
 
         command_id = p.run_command(shell_id, cmd)
-        std_out, std_err, status_code = p.get_command_output(shell_id, command_id)
+        std_out, std_err, status_code = p.get_command_output(
+            shell_id, command_id)
 
         p.cleanup_command(shell_id, command_id)
         p.close_shell(shell_id)
@@ -68,10 +71,10 @@ class WinRemoteClient(object):
         return (std_out, std_err, status_code)
 
     def copy_file(self, file):
-
         """ Not YET Implemented"""
 
-        std_out, std_err, exit_code = wsmancmd.run_wsman_cmd('powershell New-Item c:\\scripts\\' + script + ' -type file')
+        std_out, std_err, exit_code = wsmancmd.run_wsman_cmd(
+            'powershell New-Item c:\\scripts\\' + script + ' -type file')
         if std_out:
             print std_out
         if std_err:
@@ -81,3 +84,4 @@ class WinRemoteClient(object):
             for line in f:
                 std_out, std_err, exit_code = wsmancmd.run_wsman_cmd('')
                 wsmancmd.run_wsman_cmd('')
+

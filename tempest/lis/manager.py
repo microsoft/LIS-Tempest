@@ -36,6 +36,7 @@ from tempest.common import debug
 from tempest.common import isolated_creds
 from tempest.common.utils import data_utils
 from tempest.common.utils.linux import remote_client
+from tempest.common.utils.windows.remote_client import WinRemoteClient
 from tempest import config
 from tempest import exceptions
 from tempest.openstack.common import log
@@ -56,6 +57,7 @@ LOG_cinder_client.addHandler(log.NullHandler())
 
 
 class ScenarioTest(tempest.test.BaseTestCase):
+
     """Replaces the OfficialClientTest base class.
 
     Uses tempest own clients as opposed to OfficialClients.
@@ -77,6 +79,7 @@ class ScenarioTest(tempest.test.BaseTestCase):
             credentials=cls.credentials()
         )
         cls.admin_manager = clients.Manager(cls.admin_credentials())
+
         # Clients (in alphabetical order)
         cls.floating_ips_client = cls.manager.floating_ips_client
         # Glance image client v1
@@ -119,7 +122,7 @@ class ScenarioTest(tempest.test.BaseTestCase):
         return cls._get_credentials(cls.isolated_creds.get_admin_creds,
                                     'identity_admin')
 
-    # ## Methods to handle sync and async deletes
+    # Methods to handle sync and async deletes
 
     def setUp(self):
         super(ScenarioTest, self).setUp()
@@ -184,7 +187,7 @@ class ScenarioTest(tempest.test.BaseTestCase):
             waiter_callable = wait.pop('waiter_callable')
             waiter_callable(**wait)
 
-    # ## Test functions library
+    # Test functions library
     #
     # The create_[resource] functions only return body and discard the
     # resp part which is not used in scenario tests
@@ -444,6 +447,7 @@ class ScenarioTest(tempest.test.BaseTestCase):
 # TODO(yfried): change this class name to NetworkScenarioTest once client
 # migration is complete
 class NeutronScenarioTest(ScenarioTest):
+
     """Base class for network scenario tests.
     This class provide helpers for network scenario tests, using the neutron
     API. Helpers from ancestor which use the nova network API are overridden
@@ -928,6 +932,7 @@ class NeutronScenarioTest(ScenarioTest):
 
 
 class OfficialClientTest(tempest.test.BaseTestCase):
+
     """
     Official Client test base class for scenario testing.
 
@@ -1145,9 +1150,9 @@ class OfficialClientTest(tempest.test.BaseTestCase):
                       "Currently in %s status",
                       thing, log_status, new_status)
         if not tempest.test.call_until_true(
-            check_status,
-            CONF.compute.build_timeout,
-            CONF.compute.build_interval):
+                check_status,
+                CONF.compute.build_timeout,
+                CONF.compute.build_interval):
             message = ("Timed out waiting for thing %s "
                        "to become %s") % (thing_id, log_status)
             raise exceptions.TimeoutException(message)
@@ -1439,6 +1444,7 @@ class OfficialClientTest(tempest.test.BaseTestCase):
 
 # power/provision states as of icehouse
 class BaremetalPowerStates(object):
+
     """Possible power states of an Ironic node."""
     POWER_ON = 'power on'
     POWER_OFF = 'power off'
@@ -1447,6 +1453,7 @@ class BaremetalPowerStates(object):
 
 
 class BaremetalProvisionStates(object):
+
     """Possible provision states of an Ironic node."""
     NOSTATE = None
     INIT = 'initializing'
@@ -1462,12 +1469,13 @@ class BaremetalProvisionStates(object):
 
 
 class BaremetalScenarioTest(OfficialClientTest):
+
     @classmethod
     def setUpClass(cls):
         super(BaremetalScenarioTest, cls).setUpClass()
 
         if (not CONF.service_available.ironic or
-           not CONF.baremetal.driver_enabled):
+                not CONF.baremetal.driver_enabled):
             msg = 'Ironic not available or Ironic compute driver not enabled'
             raise cls.skipException(msg)
 
@@ -1491,7 +1499,7 @@ class BaremetalScenarioTest(OfficialClientTest):
             return False
 
         if not tempest.test.call_until_true(
-            check_state, timeout, interval):
+                check_state, timeout, interval):
             msg = ("Timed out waiting for node %s to reach %s state(s) %s" %
                    (node_id, state_attr, target_states))
             raise exceptions.TimeoutException(msg)
@@ -1519,7 +1527,7 @@ class BaremetalScenarioTest(OfficialClientTest):
             return node is not None
 
         if not tempest.test.call_until_true(
-            _get_node, CONF.baremetal.association_timeout, 1):
+                _get_node, CONF.baremetal.association_timeout, 1):
             msg = ('Timed out waiting to get Ironic node by instance id %s'
                    % instance_id)
             raise exceptions.TimeoutException(msg)
@@ -1589,6 +1597,7 @@ class BaremetalScenarioTest(OfficialClientTest):
 
 
 class EncryptionScenarioTest(OfficialClientTest):
+
     """
     Base class for encryption scenario tests
     """
@@ -1658,6 +1667,7 @@ class EncryptionScenarioTest(OfficialClientTest):
 
 
 class NetworkScenarioTest(OfficialClientTest):
+
     """
     Base class for network scenario tests
     """
@@ -1744,7 +1754,7 @@ class NetworkScenarioTest(OfficialClientTest):
         # Repeatedly attempt subnet creation with sequential cidr
         # blocks until an unallocated block is found.
         for subnet_cidr in tenant_cidr.subnet(
-            CONF.network.tenant_network_mask_bits):
+                CONF.network.tenant_network_mask_bits):
             str_cidr = str(subnet_cidr)
             if cidr_in_use(str_cidr, tenant_id=network.tenant_id):
                 continue
@@ -2222,6 +2232,7 @@ class NetworkScenarioTest(OfficialClientTest):
 
 
 class OrchestrationScenarioTest(OfficialClientTest):
+
     """
     Base class for orchestration scenario tests
     """
@@ -2260,7 +2271,7 @@ class OrchestrationScenarioTest(OfficialClientTest):
     def _stack_output(stack, output_key):
         """Return a stack output value for a given key."""
         return next((o['output_value'] for o in stack.outputs
-                    if o['output_key'] == output_key), None)
+                     if o['output_key'] == output_key), None)
 
     def _ping_ip_address(self, ip_address, should_succeed=True):
         cmd = ['ping', '-c1', '-w1', ip_address]
@@ -2353,6 +2364,7 @@ class OrchestrationScenarioTest(OfficialClientTest):
 
 
 class SwiftScenarioTest(ScenarioTest):
+
     """
     Provide harness to do Swift scenario tests.
 
@@ -2433,3 +2445,178 @@ class SwiftScenarioTest(ScenarioTest):
     def _download_and_verify(self, container_name, obj_name, expected_data):
         _, obj = self.object_client.get_object(container_name, obj_name)
         self.assertEqual(obj, expected_data)
+
+
+class LisBase(ScenarioTest):
+
+    def setUp(self):
+        super(LisBase, self).setUp()
+        self.host_username = CONF.host_credentials.host_user_name
+        self.host_password = CONF.host_credentials.host_password
+        self.script_folder = CONF.host_credentials.host_setupscripts_folder
+
+    def _initiate_win_clinet(self, host_name):
+        try:
+            self.win_client = WinRemoteClient(
+                host_name, self.host_username, self.host_password)
+            self.host_name = host_name
+
+        except Exception as exc:
+            LOG.exception(exc)
+            raise exc
+
+    def _initiate_linux_client(self, server_or_ip, username, private_key):
+        try:
+            self.linux_client = self.get_remote_client(
+                server_or_ip=server_or_ip,
+                username=username,
+                private_key=private_key)
+
+        except Exception as exc:
+            LOG.exception(exc)
+            self._log_console_output()
+            raise exc
+
+    def add_disk(self, instance_name, disk_type, position, vhd_type, sector_size):
+        """Attachk Disk to VM"""
+
+        ctrl_type, ctrl_id, ctrl_loc = position
+        cmd = 'powershell ' + self.script_folder
+        cmd += 'setupscripts\\attach-disk.ps1 -vmName ' + instance_name
+        cmd += ' -hvServer ' + self.host_name
+        cmd += ' -diskType ' + disk_type
+        cmd += ' -controllerType ' + ctrl_type
+        cmd += ' -controllerID ' + str(ctrl_id)
+        cmd += ' -Lun ' + str(ctrl_loc)
+        cmd += ' -vhdType ' + vhd_type
+        cmd += ' -sectorSize ' + str(sector_size)
+
+        LOG.debug('Sending command %s', cmd)
+        try:
+            std_out, std_err, exit_code = self.win_client.run_wsman_cmd(cmd)
+
+        except Exception as exc:
+            LOG.exception(exc)
+            raise exc
+
+        LOG.info('Add disk:\nstd_out: %s', std_out)
+        LOG.debug('Command std_err: %s', std_err)
+        self.assertTrue(exit_code != 0, 'Failed to add disk.')
+
+        disk_name = self.instance_name + '-' + ctrl_type + '-' + \
+            str(ctrl_id) + '-' + str(ctrl_loc) + '-' + vhd_type + '.*'
+        self.addCleanup(self.remove_disk, self.instance_name, disk_name)
+        self.disks.append(disk_name)
+
+    def attach_passthrough(self, volume_id, device):
+        _, volume = self.servers_client.attach_volume(self.server_id, volume_id, device='/dev/%s' % device)
+        self.assertEqual(volume_id, volume["volumeAttachment"]["id"])
+        self.volumes_client.wait_for_volume_status(volume_id, 'in-use')
+        return volume_id
+
+    def detach_passthrough(self, volume_id):
+        _, volume = self.servers_client.detach_volume(self.server_id, volume_id)
+        self.volumes_client.wait_for_volume_status(volume_id, 'available')
+
+    def add_passthrough_disk(self, device):
+        vol = self.create_volume()
+        try:
+           return self.attach_passthrough(vol["id"], device)
+        except Exception as exc:
+            LOG.exception(exc)
+            raise exc
+
+    def remove_disk(self, instance_name, disk_name):
+        """Cleanup for temporary disks"""
+
+        cmd = 'powershell ' + self.script_folder
+        cmd += 'setupscripts\\remove-disk.ps1 -vmName ' + \
+            instance_name + ' -hvServer ' + \
+            self.host_name + ' -diskName ' + disk_name
+
+        LOG.debug('Sending command %s', cmd)
+        try:
+            std_out, std_err, exit_code = self.win_client.run_wsman_cmd(cmd)
+
+        except Exception as exc:
+            LOG.exception(exc)
+            raise exc
+
+        LOG.info('Remove disk:\nstd_out: %s', std_out)
+        LOG.debug('Command std_err: %s', std_err)
+        self.assertTrue(exit_code != 0, 'Failed to remove disk.')
+
+    def detach_disk(self, instance_name, disk_name):
+        """Detach a disk from a vm"""
+
+        cmd = 'powershell ' + self.script_folder
+        cmd += 'setupscripts\\detach-disk.ps1 -vmName ' + \
+            instance_name + ' -hvServer ' + \
+            self.host_name + ' -diskName ' + disk_name
+
+        LOG.debug('Sending command %s', cmd)
+        try:
+            std_out, std_err, exit_code = self.win_client.run_wsman_cmd(cmd)
+
+        except Exception as exc:
+            LOG.exception(exc)
+            raise exc
+
+        LOG.info('Detach disk:\nstd_out: ' + std_out)
+        LOG.debug('Command std_err: %s', std_err)
+        self.assertTrue(exit_code != 0, 'Failed to detach disk.')
+
+    def change_cpu(self, instance_name, new_cpu_count):
+        """Detach a disk from a vm"""
+
+        cmd = 'powershell Set-VM -Name ' + instance_name + ' -ComputerName ' + \
+            self.host_name + ' -ProcessorCount ' + str(new_cpu_count)
+
+        LOG.debug('Sending command %s', cmd)
+        try:
+            std_out, std_err, exit_code = self.win_client.run_wsman_cmd(cmd)
+
+        except Exception as exc:
+            LOG.exception(exc)
+            raise exc
+
+        LOG.info('Detach disk:\nstd_out: ' + std_out)
+        LOG.debug('Command std_err: %s', std_err)
+        self.assertFalse(exit_code != 0)
+
+    def format_disk(self, expected_disk_count, filesystem):
+        try:
+            script_name = 'STOR_Lis_Disk.sh'
+            script_path = '/core/scripts/' + script_name
+            destination = '/root/'
+            my_path = os.path.abspath(
+                os.path.normpath(os.path.dirname(__file__)))
+            full_script_path = my_path + script_path
+            cmd_params = [expected_disk_count, filesystem]
+            self.linux_client.execute_script(
+                script_name, cmd_params, full_script_path, destination)
+
+        except exceptions.SSHExecCommandFailed as exc:
+            LOG.exception(exc)
+            self._log_console_output()
+            raise exc
+
+        except Exception as exc:
+            LOG.exception(exc)
+            self._log_console_output()
+            raise exc
+
+    def count_disks(self):
+        try:
+            self.linux_client.get_disks_count()
+            return self.linux_client.get_disks_count(60)
+
+        except exceptions.SSHExecCommandFailed as exc:
+            LOG.exception(exc)
+            self._log_console_output()
+            raise exc
+
+        except Exception as exc:
+            LOG.exception(exc)
+            self._log_console_output()
+            raise exc

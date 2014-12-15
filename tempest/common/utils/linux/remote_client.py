@@ -154,7 +154,22 @@ class RemoteClient():
         output = self.exec_command(command)
         return int(output)
 
+    def get_disks_count(self, sleep_count=1):
+        command = 'sleep ' + \
+            str(sleep_count) + '; fdisk -l | grep "Disk /dev/sd*" | wc -l'
+        output = self.exec_command(command)
+        return int(output)
+
     def verify_ping(self, destination_ip, dev='eth0'):
         cmd = "ping -I {dev} -c 10 {destination_ip}".format(
             dev=dev, destination_ip=destination_ip)
         return self.exec_command(cmd)
+
+    def execute_script(self, cmd, cmd_params, source, destination):
+        self.exec_command('ls')
+        self.copy_over(source, destination)
+        self.exec_command(
+            'cd ' + destination + ' dos2unix ' + cmd)
+        self.exec_command('chmod +x ' + cmd)
+        cmd_args = ' '.join(str(x) for x in cmd_params)
+        self.exec_command('./' + cmd + ' ' + cmd_args)
