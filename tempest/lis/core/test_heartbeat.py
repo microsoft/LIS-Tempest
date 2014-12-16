@@ -1,5 +1,4 @@
 # Copyright 2014 Cloudbase Solutions Srl
-# All rights reserved
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
 #    not use this file except in compliance with the License. You may obtain
@@ -13,10 +12,12 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import pdb
+import os
 from tempest import config
+from tempest.openstack.common import log as logging
 from tempest.common.utils.windows.remote_client import WinRemoteClient
 from tempest.lis import manager
-from tempest.openstack.common import log as logging
 from tempest.scenario import utils as test_utils
 from tempest import test
 
@@ -27,22 +28,10 @@ LOG = logging.getLogger(__name__)
 load_tests = test_utils.load_tests_input_scenario_utils
 
 
-class TestLis(manager.ScenarioTest):
-
-    """
-    This smoke test case follows this basic set of operations:
-
-     * Create a keypair for use in launching an instance
-     * Create a security group to control network access in instance
-     * Add simple permissive rules to the security group
-     * Launch an instance
-     * Pause/unpause the instance
-     * Suspend/resume the instance
-     * Terminate the instance
-    """
+class HeartBeat(manager.LisBase):
 
     def setUp(self):
-        super(TestLis, self).setUp()
+        super(HeartBeat, self).setUp()
         # Setup image and flavor the test instance
         # Support both configured and injected values
         if not hasattr(self, 'image_ref'):
@@ -82,32 +71,28 @@ class TestLis(manager.ScenarioTest):
                                            create_kwargs=create_kwargs)
         self.instance_name = self.instance["OS-EXT-SRV-ATTR:instance_name"]
         self.host_name = self.instance["OS-EXT-SRV-ATTR:hypervisor_hostname"]
+        self._initiate_win_clien    t(self.host_name)
 
-    def verify_heartbeat(self):
-        """ use actual credentials from conf file"""
-        username = CONF.host_credentials.host_user_name
-        password = CONF.host_credentials.host_password
-        cmd = 'powershell -Command $(Get-VMIntegrationService -ComputerName ' + self.host_name +' -VMName '+  self.instance_name +' -Name Heartbeat).Enabled'
+    def nova_floating_ip_create(self):
+        _, self.floating_ip = self.floating_ips_client.create_floating_ip()
+        self.addCleanup(self.delete_wrapper,
+                        self.floating_ips_client.delete_floating_ip,
+                        self.floating_ip['id'])
 
-        wsmancmd = WinRemoteClient(self.host_name, username, password)
-        LOG.debug('Sending command %s', cmd)
-        try:
-            std_out, std_err, exit_code = wsmancmd.run_wsman_cmd(cmd)
+    def nova_floating_ip_add(self):
+        self.floating_ips_client.associate_floating_ip_to_server(
+            self.floating_ip['ip'], self.instance['id'])
 
-        except Exception as exc:
-            LOG.exception(exc)
-            raise exc
-
-        LOG.debug('Command std_out: %s', std_out)
-        LOG.debug('Command std_err: %s', std_err)
-
-        ok = "True" in std_out
-        self.assertEqual(ok, True)
-
-    @test.services('compute', 'network')
-    def test_server_lis_heartbeat(self):
+    def spawn_vm(self):
         self.add_keypair()
         self.security_group = self._create_security_group()
         self.boot_instance()
-        self.verify_heartbeat()
-        self.servers_client.delete_server(self.instance['id'])
+        self.nova_floating_ip_create()
+        self.nova_floating_ip_add()
+        self.server_id = self.instance['id']
+
+    @test.attr(type=['smoke', 'core'])
+    @test.services('compute', 'network')
+    def test_heartbeat(self):
+        self.spawn_vm()
+        self.verify_heartbeat(self.instance_name)
