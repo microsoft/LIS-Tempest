@@ -86,7 +86,7 @@ class Storage(manager.LisBase):
                                            create_kwargs=create_kwargs)
         self.instance_name = self.instance["OS-EXT-SRV-ATTR:instance_name"]
         self.host_name = self.instance["OS-EXT-SRV-ATTR:hypervisor_hostname"]
-        self._initiate_win_clinet(self.host_name)
+        self._initiate_win_client(self.host_name)
 
     def nova_floating_ip_create(self):
         _, self.floating_ip = self.floating_ips_client.create_floating_ip()

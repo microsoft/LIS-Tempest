@@ -2455,7 +2455,7 @@ class LisBase(ScenarioTest):
         self.host_password = CONF.host_credentials.host_password
         self.script_folder = CONF.host_credentials.host_setupscripts_folder
 
-    def _initiate_win_clinet(self, host_name):
+    def _initiate_win_client(self, host_name):
         try:
             self.win_client = WinRemoteClient(
                 host_name, self.host_username, self.host_password)
@@ -2496,7 +2496,8 @@ class LisBase(ScenarioTest):
             std_out, std_err, exit_code = self.win_client.run_wsman_cmd(cmd)
             LOG.info('Add disk:\nstd_out: %s', std_out)
             LOG.debug('Command std_err: %s', std_err)
-            self.assertTrue(exit_code == 0, 'Failed to add disk.')
+            self.assertTrue(
+                exit_code == 0, 'Failed to add disk.\n' + str(std_out) + '\n' + str(std_err))
 
             disk_name = self.instance_name + '-' + ctrl_type + '-' + \
                 str(ctrl_id) + '-' + str(ctrl_loc) + '-' + vhd_type + '.*'
@@ -2524,7 +2525,8 @@ class LisBase(ScenarioTest):
             std_out, std_err, exit_code = self.win_client.run_wsman_cmd(cmd)
             LOG.info('Add disk:\nstd_out: %s', std_out)
             LOG.debug('Command std_err: %s', std_err)
-            self.assertTrue(exit_code == 0, 'Failed to add diff disk.')
+            self.assertTrue(
+                exit_code == 0, 'Failed to add diff disk.' + str(std_out) + '\n' + str(std_err))
             disk_name = self.instance_name + '-' + ctrl_type + '-' + \
                 str(ctrl_id) + '-' + str(ctrl_loc) + '-Diff.' + vhd_type
             self.addCleanup(self.remove_disk, self.instance_name, disk_name)
@@ -2567,7 +2569,8 @@ class LisBase(ScenarioTest):
             std_out, std_err, exit_code = self.win_client.run_wsman_cmd(cmd)
             LOG.info('Remove disk:\nstd_out: %s', std_out)
             LOG.debug('Command std_err: %s', std_err)
-            self.assertTrue(exit_code == 0, 'Failed to remove disk.')
+            self.assertTrue(
+                exit_code == 0, 'Failed to remove disk.' + str(std_out) + '\n' + str(std_err))
 
         except Exception as exc:
             LOG.exception(exc)
@@ -2586,7 +2589,8 @@ class LisBase(ScenarioTest):
             std_out, std_err, exit_code = self.win_client.run_wsman_cmd(cmd)
             LOG.info('Detach disk:\nstd_out: ' + std_out)
             LOG.debug('Command std_err: %s', std_err)
-            self.assertTrue(exit_code != 0, 'Failed to detach disk.')
+            self.assertTrue(
+                exit_code == 0, 'Failed to detach disk.' + str(std_out) + '\n' + str(std_err))
 
         except Exception as exc:
             LOG.exception(exc)
@@ -2603,7 +2607,8 @@ class LisBase(ScenarioTest):
             std_out, std_err, exit_code = self.win_client.run_wsman_cmd(cmd)
             LOG.info('Detach disk:\nstd_out: ' + std_out)
             LOG.debug('Command std_err: %s', std_err)
-            self.assertTrue(exit_code == 0, 'Failed to get parent disk size.')
+            self.assertTrue(
+                exit_code == 0, 'Failed to get parent disk size.' + str(std_out) + '\n' + str(std_err))
             return int(std_out)
         except Exception as exc:
             LOG.exception(exc)
@@ -2650,7 +2655,8 @@ class LisBase(ScenarioTest):
         try:
             std_out, std_err, exit_code = self.win_client.run_wsman_cmd(cmd)
             LOG.debug('Command std_err: %s', std_err)
-            self.assertTrue(exit_code == 0, 'Failed to take snapshot.')
+            self.assertTrue(
+                exit_code == 0, 'Failed to take snapshot.' + str(std_out) + '\n' + str(std_err))
         except Exception as exc:
             LOG.exception(exc)
             raise exc
@@ -2662,7 +2668,8 @@ class LisBase(ScenarioTest):
         try:
             std_out, std_err, exit_code = self.win_client.run_wsman_cmd(cmd)
             LOG.debug('Command std_err: %s', std_err)
-            self.assertTrue(exit_code == 0, 'Failed to revert snapshot.')
+            self.assertTrue(
+                exit_code == 0, 'Failed to revert snapshot.' + str(std_out) + '\n' + str(std_err))
         except Exception as exc:
             LOG.exception(exc)
             raise exc
@@ -2691,7 +2698,7 @@ class LisBase(ScenarioTest):
 
     def count_disks(self):
         try:
-            self.linux_client.get_disks_count()
+            self.linux_client.get_disks_count(30)
             return self.linux_client.get_disks_count(60)
 
         except exceptions.SSHExecCommandFailed as exc:
@@ -2724,4 +2731,22 @@ class LisBase(ScenarioTest):
         except Exception as exc:
             LOG.exception(exc)
             self._log_console_output()
+            raise exc
+
+    def verify_heartbeat(self, instance_name):
+        cmd = 'powershell -Command $(Get-VMIntegrationService -ComputerName ' + \
+            self.host_name + ' -VMName ' + \
+            instance_name + ' -Name Heartbeat).Enabled'
+
+        LOG.debug('Sending command %s', cmd)
+        try:
+            import pdb
+            pdb.set_trace()
+            std_out, std_err, exit_code = self.win_client.run_wsman_cmd(cmd)
+
+            LOG.debug('Command std_out: %s', std_out)
+            LOG.debug('Command std_err: %s', std_err)
+            self.assertTrue("True" in std_out, 'Heartbeat status %s ' % std_out)
+        except Exception as exc:
+            LOG.exception(exc)
             raise exc
