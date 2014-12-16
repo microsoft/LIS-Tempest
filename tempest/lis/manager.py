@@ -2494,34 +2494,62 @@ class LisBase(ScenarioTest):
         LOG.debug('Sending command %s', cmd)
         try:
             std_out, std_err, exit_code = self.win_client.run_wsman_cmd(cmd)
+            LOG.info('Add disk:\nstd_out: %s', std_out)
+            LOG.debug('Command std_err: %s', std_err)
+            self.assertTrue(exit_code == 0, 'Failed to add disk.')
+
+            disk_name = self.instance_name + '-' + ctrl_type + '-' + \
+                str(ctrl_id) + '-' + str(ctrl_loc) + '-' + vhd_type + '.*'
+            self.addCleanup(self.remove_disk, self.instance_name, disk_name)
+            self.disks.append(disk_name)
 
         except Exception as exc:
             LOG.exception(exc)
             raise exc
 
-        LOG.info('Add disk:\nstd_out: %s', std_out)
-        LOG.debug('Command std_err: %s', std_err)
-        self.assertTrue(exit_code != 0, 'Failed to add disk.')
+    def add_diff_disk(self, instance_name, position, vhd_type):
+        """Attach diff Disk to VM"""
 
-        disk_name = self.instance_name + '-' + ctrl_type + '-' + \
-            str(ctrl_id) + '-' + str(ctrl_loc) + '-' + vhd_type + '.*'
-        self.addCleanup(self.remove_disk, self.instance_name, disk_name)
-        self.disks.append(disk_name)
+        ctrl_type, ctrl_id, ctrl_loc = position
+        cmd = 'powershell ' + self.script_folder
+        cmd += 'setupscripts\\add-diff-disk.ps1 -vmName ' + instance_name
+        cmd += ' -hvServer ' + self.host_name
+        cmd += ' -controllerType ' + ctrl_type
+        cmd += ' -controllerId ' + str(ctrl_id)
+        cmd += ' -Lun ' + str(ctrl_loc)
+        cmd += ' -parentType ' + vhd_type
+
+        LOG.debug('Sending command %s', cmd)
+        try:
+            std_out, std_err, exit_code = self.win_client.run_wsman_cmd(cmd)
+            LOG.info('Add disk:\nstd_out: %s', std_out)
+            LOG.debug('Command std_err: %s', std_err)
+            self.assertTrue(exit_code == 0, 'Failed to add diff disk.')
+            disk_name = self.instance_name + '-' + ctrl_type + '-' + \
+                str(ctrl_id) + '-' + str(ctrl_loc) + '-Diff.' + vhd_type
+            self.addCleanup(self.remove_disk, self.instance_name, disk_name)
+            self.disks.append(disk_name)
+
+        except Exception as exc:
+            LOG.exception(exc)
+            raise exc
 
     def attach_passthrough(self, volume_id, device):
-        _, volume = self.servers_client.attach_volume(self.server_id, volume_id, device='/dev/%s' % device)
+        _, volume = self.servers_client.attach_volume(
+            self.server_id, volume_id, device='/dev/%s' % device)
         self.assertEqual(volume_id, volume["volumeAttachment"]["id"])
         self.volumes_client.wait_for_volume_status(volume_id, 'in-use')
         return volume_id
 
     def detach_passthrough(self, volume_id):
-        _, volume = self.servers_client.detach_volume(self.server_id, volume_id)
+        _, volume = self.servers_client.detach_volume(
+            self.server_id, volume_id)
         self.volumes_client.wait_for_volume_status(volume_id, 'available')
 
     def add_passthrough_disk(self, device):
         vol = self.create_volume()
         try:
-           return self.attach_passthrough(vol["id"], device)
+            return self.attach_passthrough(vol["id"], device)
         except Exception as exc:
             LOG.exception(exc)
             raise exc
@@ -2537,14 +2565,13 @@ class LisBase(ScenarioTest):
         LOG.debug('Sending command %s', cmd)
         try:
             std_out, std_err, exit_code = self.win_client.run_wsman_cmd(cmd)
+            LOG.info('Remove disk:\nstd_out: %s', std_out)
+            LOG.debug('Command std_err: %s', std_err)
+            self.assertTrue(exit_code == 0, 'Failed to remove disk.')
 
         except Exception as exc:
             LOG.exception(exc)
             raise exc
-
-        LOG.info('Remove disk:\nstd_out: %s', std_out)
-        LOG.debug('Command std_err: %s', std_err)
-        self.assertTrue(exit_code != 0, 'Failed to remove disk.')
 
     def detach_disk(self, instance_name, disk_name):
         """Detach a disk from a vm"""
@@ -2557,14 +2584,30 @@ class LisBase(ScenarioTest):
         LOG.debug('Sending command %s', cmd)
         try:
             std_out, std_err, exit_code = self.win_client.run_wsman_cmd(cmd)
+            LOG.info('Detach disk:\nstd_out: ' + std_out)
+            LOG.debug('Command std_err: %s', std_err)
+            self.assertTrue(exit_code != 0, 'Failed to detach disk.')
 
         except Exception as exc:
             LOG.exception(exc)
             raise exc
 
-        LOG.info('Detach disk:\nstd_out: ' + std_out)
-        LOG.debug('Command std_err: %s', std_err)
-        self.assertTrue(exit_code != 0, 'Failed to detach disk.')
+    def get_parent_disk_size(self, disk_name):
+
+        cmd = 'powershell ' + self.script_folder
+        cmd += 'setupscripts\\get-parent-disk-size.ps1 ' + \
+            ' -hvServer ' + self.host_name + ' -diskName ' + disk_name
+
+        LOG.debug('Sending command %s', cmd)
+        try:
+            std_out, std_err, exit_code = self.win_client.run_wsman_cmd(cmd)
+            LOG.info('Detach disk:\nstd_out: ' + std_out)
+            LOG.debug('Command std_err: %s', std_err)
+            self.assertTrue(exit_code == 0, 'Failed to get parent disk size.')
+            return int(std_out)
+        except Exception as exc:
+            LOG.exception(exc)
+            raise exc
 
     def change_cpu(self, instance_name, new_cpu_count):
         """Detach a disk from a vm"""
@@ -2583,6 +2626,46 @@ class LisBase(ScenarioTest):
         LOG.info('Detach disk:\nstd_out: ' + std_out)
         LOG.debug('Command std_err: %s', std_err)
         self.assertFalse(exit_code != 0)
+
+    def take_revert_snapshot(self, instance_name, snapshot_name='LisTest'):
+        cmd = 'powershell ' + self.script_folder
+        cmd += 'setupscripts\\STOR_TakeRevert_Snapshot.ps1 ' + \
+            ' -hvServer ' + self.host_name + ' -vmName ' + \
+            instance_name + ' -snapshotName ' + snapshot_name
+        LOG.debug('Sending command %s', cmd)
+        try:
+            std_out, std_err, exit_code = self.win_client.run_wsman_cmd(cmd)
+            LOG.info('Detach disk:\nstd_out: ' + std_out)
+            LOG.debug('Command std_err: %s', std_err)
+            self.assertTrue(
+                exit_code == 0, 'Failed to take and revert snapshot.')
+        except Exception as exc:
+            LOG.exception(exc)
+            raise exc
+
+    def take_snapshot(self, instance_name, snapshot_name):
+        cmd = 'powershell Checkpoint-VM -Name ' + instance_name + ' -ComputerName ' + \
+            self.host_name + ' -SnapshotName ' + snapshot_name
+        LOG.debug('Sending command %s', cmd)
+        try:
+            std_out, std_err, exit_code = self.win_client.run_wsman_cmd(cmd)
+            LOG.debug('Command std_err: %s', std_err)
+            self.assertTrue(exit_code == 0, 'Failed to take snapshot.')
+        except Exception as exc:
+            LOG.exception(exc)
+            raise exc
+
+    def revert_snapshot(self, instance_name, snapshot_name):
+        cmd = 'powershell Restore-VMSnapshot -VMName ' + instance_name + ' -ComputerName ' + \
+            self.host_name + ' -Name ' + snapshot_name + '  -Confirm:$false'
+        LOG.debug('Sending command %s', cmd)
+        try:
+            std_out, std_err, exit_code = self.win_client.run_wsman_cmd(cmd)
+            LOG.debug('Command std_err: %s', std_err)
+            self.assertTrue(exit_code == 0, 'Failed to revert snapshot.')
+        except Exception as exc:
+            LOG.exception(exc)
+            raise exc
 
     def format_disk(self, expected_disk_count, filesystem):
         try:
@@ -2610,6 +2693,28 @@ class LisBase(ScenarioTest):
         try:
             self.linux_client.get_disks_count()
             return self.linux_client.get_disks_count(60)
+
+        except exceptions.SSHExecCommandFailed as exc:
+            LOG.exception(exc)
+            self._log_console_output()
+            raise exc
+
+        except Exception as exc:
+            LOG.exception(exc)
+            self._log_console_output()
+            raise ex
+
+    def increase_disk_size(self):
+        try:
+            script_name = 'STOR_diff_disk.sh'
+            script_path = '/core/scripts/' + script_name
+            destination = '/root/'
+            my_path = os.path.abspath(
+                os.path.normpath(os.path.dirname(__file__)))
+            full_script_path = my_path + script_path
+            cmd_params = []
+            self.linux_client.execute_script(
+                script_name, cmd_params, full_script_path, destination)
 
         except exceptions.SSHExecCommandFailed as exc:
             LOG.exception(exc)

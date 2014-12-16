@@ -191,8 +191,6 @@ class Storage(manager.LisBase):
         self._initiate_linux_client(self.floating_ip['ip'], self.image_utils.ssh_user(
             self.image_ref), self.keypair['private_key'])
         try:
-            import pdb
-            pdb.set_trace()
             for disk in self.disks:
                 self.detach_passthrough(disk)
 
@@ -300,6 +298,47 @@ class Storage(manager.LisBase):
         self.assertEqual(disk_count, 1)
         self.servers_client.delete_server(self.instance['id'])
 
+    def _test_diff_disk(self, pos):
+        self.spawn_vm()
+        self.servers_client.stop(self.server_id)
+        self.servers_client.wait_for_server_status(self.server_id, 'SHUTOFF')
+        self.add_diff_disk(self.instance_name, pos, self.disk_type)
+        self.servers_client.start(self.server_id)
+        self.servers_client.wait_for_server_status(self.server_id, 'ACTIVE')
+        self._initiate_linux_client(self.floating_ip['ip'], self.image_utils.ssh_user(
+            self.image_ref), self.keypair['private_key'])
+        initial_disk_size = self.get_parent_disk_size(self.disks[0])
+        self.increase_disk_size()
+        final_disk_size = self.get_parent_disk_size(self.disks[0])
+        self.assertEqual(initial_disk_size, final_disk_size)
+        self.servers_client.delete_server(self.instance['id'])
+
+    def _test_take_revert_snapshot(self):
+        positions = [('SCSI', 1, 1), ('SCSI', 1, 2)]
+        self.spawn_vm()
+        disk_type = 'Dynamic'
+        self.servers_client.stop(self.server_id)
+        self.servers_client.wait_for_server_status(self.server_id, 'SHUTOFF')
+        self.add_disk(self.instance_name, disk_type, positions[0], 'vhd', self.sector_size)
+        self.add_disk(self.instance_name, disk_type, positions[1], 'vhdx', self.sector_size)
+        self.take_snapshot(self.instance_name, 'before_file')
+        self.servers_client.start(self.server_id)
+        self.servers_client.wait_for_server_status(self.server_id, 'ACTIVE')
+
+        self._initiate_linux_client(self.floating_ip['ip'], self.image_utils.ssh_user(
+            self.image_ref), self.keypair['private_key'])
+        self.linux_client.create_file('snapshot_test')
+        self.servers_client.stop(self.server_id)
+        self.servers_client.wait_for_server_status(self.server_id, 'SHUTOFF')
+        self.take_snapshot(self.instance_name, 'after_file')
+
+        self.revert_snapshot(self.instance_name, 'before_file')
+        self.servers_client.start(self.server_id)
+        self.servers_client.wait_for_server_status(self.server_id, 'ACTIVE')
+        result = self.linux_client.check_file_existence('snapshot_test')
+        self.assertEqual(result, 0)
+        self.servers_client.delete_server(self.instance['id'])
+
     def _test_storage_fixed_ide(self):
         position = ('IDE', 1, 1)
         self._test_storage(position, 'Fixed', 1, self.file_system)
@@ -367,6 +406,19 @@ class Storage(manager.LisBase):
     def _test_storage_dynamic_hot_add_multi_scsi(self):
         positions = [('SCSI', 0, 0), ('SCSI', 0, 1)]
         self._test_hot_add_storage(positions, 'Dynamic', 2, self.file_system)
+
+    def _test_diff_disk_ide(self):
+        position = ('IDE', 1, 1)
+        self._test_diff_disk(position)
+
+    def _test_diff_disk_scsi(self):
+        position = ('SCSI', 1, 1)
+        self._test_diff_disk(position)
+
+    @test.attr(type=['smoke', 'core_storage', 'snapshot', 'SCSI'])
+    @test.services('compute', 'network')
+    def test_take_revert_snapshot_scsi(self):
+        self._test_take_revert_snapshot()
 
 
 class TestVHD(Storage):
@@ -470,15 +522,12 @@ class TestVHD(Storage):
     @test.attr(type=['smoke', 'core_storage', 'vhd', 'differencing', 'IDE'])
     @test.services('compute', 'network')
     def test_storage_vhd_differencing_ide(self):
-        # NYI
-        self._test_storage(location, 'Diff', 1, 'ext3')
+        self._test_diff_disk_ide()
 
     @test.attr(type=['smoke', 'core_storage', 'vhd', 'differencing', 'SCSI'])
     @test.services('compute', 'network')
     def test_storage_vhd_differencing_scsi(self):
-        # NYI
-        self._test_storage(location, 'Diff', 1, 'ext3')
-
+        self._test_diff_disk_scsi()
 
 class TestVHDx(Storage):
 
@@ -552,17 +601,15 @@ class TestVHDx(Storage):
     def test_storage_vhdx_dynamic_hot_add_multi_scsi():
         self._test_storage_dynamic_hot_add_multi_scsi()
 
-    @test.attr(type=['core_storage', 'vhd', 'differencing', 'IDE'])
+    @test.attr(type=['core_storage', 'vhdx', 'differencing', 'IDE'])
     @test.services('compute', 'network')
     def test_storage_vhdx_differencing_ide(self):
-        # NYI
-        self._test_storage('vhdx', 'IDE', 1, 1, "Diff", 512, 1, 'ext3')
+        self._test_diff_disk_ide()
 
     @test.attr(type=['core_storage', 'vhdx', 'differencing', 'SCSI'])
     @test.services('compute', 'network')
     def test_storage_vhdx_differencing_scsi(self):
-        # NYI
-        self._test_storage('vhdx', 'SCSI', 0, 1, 'Diff', 512, 1, 'ext3')
+        self._test_diff_disk_scsi()
 
 
 class TestVHDx4K(Storage):

@@ -149,6 +149,10 @@ class RemoteClient():
         cmd = 'cat %s' % file_name
         return self.exec_command(cmd)
 
+    def check_file_existence(self, file_name):
+        cmd = ' [ -f %s ] && echo 1 || echo 0' % file_name
+        return int(self.exec_command(cmd))
+
     def get_unix_time(self):
         command = 'date +%s'
         output = self.exec_command(command)
@@ -169,7 +173,7 @@ class RemoteClient():
         self.exec_command('ls')
         self.copy_over(source, destination)
         self.exec_command(
-            'cd ' + destination + ' dos2unix ' + cmd)
+            'cd ' + destination + '; dos2unix ' + cmd)
         self.exec_command('chmod +x ' + cmd)
         cmd_args = ' '.join(str(x) for x in cmd_params)
         self.exec_command('./' + cmd + ' ' + cmd_args)
