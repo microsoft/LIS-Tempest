@@ -316,11 +316,11 @@ class Storage(manager.LisBase):
     def _test_take_revert_snapshot(self):
         positions = [('SCSI', 1, 1), ('SCSI', 1, 2)]
         self.spawn_vm()
-        disk_type = 'Dynamic'
+        vhd_type = 'Dynamic'
         self.servers_client.stop(self.server_id)
         self.servers_client.wait_for_server_status(self.server_id, 'SHUTOFF')
-        self.add_disk(self.instance_name, disk_type, positions[0], 'vhd', self.sector_size)
-        self.add_disk(self.instance_name, disk_type, positions[1], 'vhdx', self.sector_size)
+        self.add_disk(self.instance_name, 'vhd', positions[0], vhd_type, self.sector_size)
+        self.add_disk(self.instance_name, 'vhdx', positions[1], vhd_type, self.sector_size)
         self.take_snapshot(self.instance_name, 'before_file')
         self.servers_client.start(self.server_id)
         self.servers_client.wait_for_server_status(self.server_id, 'ACTIVE')
@@ -529,6 +529,12 @@ class TestVHD(Storage):
     def test_storage_vhd_differencing_scsi(self):
         self._test_diff_disk_scsi()
 
+    @test.services('compute', 'network')
+    def test_take_revert_snapshot_scsi(self):
+        skip_msg = ("Obsolete")
+        raise self.skipException(skip_msg)
+
+
 class TestVHDx(Storage):
 
     def setUp(self):
@@ -578,7 +584,7 @@ class TestVHDx(Storage):
 
     @test.attr(type=['smoke', 'core_storage', 'vhdx', 'dynamic', 'hot', 'SCSI'])
     @test.services('compute', 'network')
-    def test_storage_vhdx_dynamic_hot_add_scsi():
+    def test_storage_vhdx_dynamic_hot_add_scsi(self):
         self._test_storage_dynamic_hot_add_scsi()
 
     @test.attr(type=['core_storage', 'vhdx', 'dynamic', 'hot', 'SCSI'])
@@ -598,7 +604,7 @@ class TestVHDx(Storage):
 
     @test.attr(type=['smoke', 'core_storage', 'vhdx', 'dynamic', 'hot', 'SCSI'])
     @test.services('compute', 'network')
-    def test_storage_vhdx_dynamic_hot_add_multi_scsi():
+    def test_storage_vhdx_dynamic_hot_add_multi_scsi(self):
         self._test_storage_dynamic_hot_add_multi_scsi()
 
     @test.attr(type=['core_storage', 'vhdx', 'differencing', 'IDE'])
@@ -611,6 +617,10 @@ class TestVHDx(Storage):
     def test_storage_vhdx_differencing_scsi(self):
         self._test_diff_disk_scsi()
 
+    @test.services('compute', 'network')
+    def test_take_revert_snapshot_scsi(self):
+        skip_msg = ("Obsolete")
+        raise self.skipException(skip_msg)
 
 class TestVHDx4K(Storage):
 
@@ -626,7 +636,7 @@ class TestVHDx4K(Storage):
 
     @test.attr(type=['core_storage', 'vhdx', 'fixed', 'SCSI'])
     @test.services('compute', 'network')
-    def test_storage_vhdx__4k_fixed_scsi(self):
+    def test_storage_vhdx_4k_fixed_scsi(self):
         self._test_storage_fixed_scsi()
 
     @test.attr(type=['core_storage', 'vhdx', 'dynamic', 'IDE'])
@@ -661,7 +671,7 @@ class TestVHDx4K(Storage):
 
     @test.attr(type=['core_storage', 'vhdx', 'dynamic', 'hot', 'SCSI'])
     @test.services('compute', 'network')
-    def test_storage_vhdx_4k_dynamic_hot_add_scsi():
+    def test_storage_vhdx_4k_dynamic_hot_add_scsi(self):
         self._test_storage_dynamic_hot_add_scsi()
 
     @test.attr(type=['core_storage', 'vhdx', 'dynamic', 'hot', 'SCSI'])
@@ -681,5 +691,10 @@ class TestVHDx4K(Storage):
 
     @test.attr(type=['core_storage', 'vhdx', 'dynamic', 'hot', 'SCSI'])
     @test.services('compute', 'network')
-    def test_storage_vhdx_4k_dynamic_hot_add_multi_scsi():
+    def test_storage_vhdx_4k_dynamic_hot_add_multi_scsi(self):
         self._test_storage_dynamic_hot_add_multi_scsi()
+
+    @test.services('compute', 'network')
+    def test_take_revert_snapshot_scsi(self):
+        skip_msg = ("Obsolete")
+        raise self.skipException(skip_msg)
