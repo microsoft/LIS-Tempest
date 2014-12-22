@@ -2477,64 +2477,57 @@ class LisBase(ScenarioTest):
             self._log_console_output()
             raise exc
 
-    def add_disk(self, instance_name, disk_type, position, vhd_type, sector_size):
-        """Attachk Disk to VM"""
+    def add_disk(self, instance_name, disk_type, position, vhd_type, sec_size):
+        """Attach Disk to VM"""
 
         ctrl_type, ctrl_id, ctrl_loc = position
-        cmd = 'powershell ' + self.script_folder
-        cmd += 'setupscripts\\attach-disk.ps1 -vmName ' + instance_name
-        cmd += ' -hvServer ' + self.host_name
-        cmd += ' -diskType ' + disk_type
-        cmd += ' -controllerType ' + ctrl_type
-        cmd += ' -controllerID ' + str(ctrl_id)
-        cmd += ' -Lun ' + str(ctrl_loc)
-        cmd += ' -vhdType ' + vhd_type
-        cmd += ' -sectorSize ' + str(sector_size)
+        script_location = "%s%s" % (self.script_folder,
+                                    'setupscripts\\attach-disk.ps1')
+        s_out, s_err, e_code = self.win_client.run_powershell_cmd(
+                                script_location,
+                                vmName=instance_name,
+                                hvServer=self.host_name,
+                                diskType=disk_type,
+                                controllerType=ctrl_type,
+                                controllerID=ctrl_id,
+                                Lun=ctrl_loc,
+                                vhdType=vhd_type,
+                                sectorSize=sec_size)
 
-        LOG.debug('Sending command %s', cmd)
-        try:
-            std_out, std_err, exit_code = self.win_client.run_wsman_cmd(cmd)
-            LOG.info('Add disk:\nstd_out: %s', std_out)
-            LOG.debug('Command std_err: %s', std_err)
-            self.assertTrue(
-                exit_code == 0, 'Failed to add disk.\n' + str(std_out) + '\n' + str(std_err))
+        LOG.info('Add disk result: %s', s_out)
+        assert_msg = '%s\n%s\n%s' % ('Failed to add disk.',
+                                     str(s_out), str(s_err))
+        self.assertTrue(e_code == 0, assert_msg)
 
-            disk_name = self.instance_name + '-' + ctrl_type + '-' + \
-                str(ctrl_id) + '-' + str(ctrl_loc) + '-' + vhd_type + '.*'
-            self.addCleanup(self.remove_disk, self.instance_name, disk_name)
-            self.disks.append(disk_name)
-
-        except Exception as exc:
-            LOG.exception(exc)
-            raise exc
+        disk_name = '-'.join([self.instance_name, ctrl_type,
+                            str(ctrl_id), str(ctrl_loc), vhd_type]) + '.*'
+        self.addCleanup(self.remove_disk, self.instance_name, disk_name)
+        self.disks.append(disk_name)
 
     def add_diff_disk(self, instance_name, position, vhd_type):
         """Attach diff Disk to VM"""
 
         ctrl_type, ctrl_id, ctrl_loc = position
-        cmd = 'powershell ' + self.script_folder
-        cmd += 'setupscripts\\add-diff-disk.ps1 -vmName ' + instance_name
-        cmd += ' -hvServer ' + self.host_name
-        cmd += ' -controllerType ' + ctrl_type
-        cmd += ' -controllerId ' + str(ctrl_id)
-        cmd += ' -Lun ' + str(ctrl_loc)
-        cmd += ' -parentType ' + vhd_type
+        script_location = "%s%s" % (self.script_folder,
+                                    'setupscripts\\add-diff-disk.ps1')
+        s_out, s_err, e_code = self.win_client.run_powershell_cmd(
+                                script_location,
+                                vmName=instance_name,
+                                hvServer=self.host_name,
+                                controllerType=ctrl_type,
+                                controllerId=ctrl_id,
+                                Lun=ctrl_loc,
+                                parentType=vhd_type)
 
-        LOG.debug('Sending command %s', cmd)
-        try:
-            std_out, std_err, exit_code = self.win_client.run_wsman_cmd(cmd)
-            LOG.info('Add disk:\nstd_out: %s', std_out)
-            LOG.debug('Command std_err: %s', std_err)
-            self.assertTrue(
-                exit_code == 0, 'Failed to add diff disk.' + str(std_out) + '\n' + str(std_err))
-            disk_name = self.instance_name + '-' + ctrl_type + '-' + \
-                str(ctrl_id) + '-' + str(ctrl_loc) + '-Diff.' + vhd_type
-            self.addCleanup(self.remove_disk, self.instance_name, disk_name)
-            self.disks.append(disk_name)
+        LOG.info('Add diff disk result: %s', s_out)
+        assert_msg = '%s\n%s\n%s' % ('Failed to add diff disk.',
+                                     str(s_out), str(s_err))
+        self.assertTrue(e_code == 0, assert_msg)
 
-        except Exception as exc:
-            LOG.exception(exc)
-            raise exc
+        disk_name = '-'.join([self.instance_name, ctrl_type,
+                            str(ctrl_id), str(ctrl_loc), 'Diff.']) + vhd_type
+        self.addCleanup(self.remove_disk, self.instance_name, disk_name)
+        self.disks.append(disk_name)
 
     def attach_passthrough(self, volume_id, device):
         _, volume = self.servers_client.attach_volume(
@@ -2559,120 +2552,99 @@ class LisBase(ScenarioTest):
     def remove_disk(self, instance_name, disk_name):
         """Cleanup for temporary disks"""
 
-        cmd = 'powershell ' + self.script_folder
-        cmd += 'setupscripts\\remove-disk.ps1 -vmName ' + \
-            instance_name + ' -hvServer ' + \
-            self.host_name + ' -diskName ' + disk_name
+        script_location = "%s%s" % (self.script_folder,
+                                    'setupscripts\\remove-disk.ps1')
+        s_out, s_err, e_code = self.win_client.run_powershell_cmd(
+                                script_location,
+                                vmName=instance_name,
+                                hvServer=self.host_name,
+                                diskName=disk_name)
 
-        LOG.debug('Sending command %s', cmd)
-        try:
-            std_out, std_err, exit_code = self.win_client.run_wsman_cmd(cmd)
-            LOG.info('Remove disk:\nstd_out: %s', std_out)
-            LOG.debug('Command std_err: %s', std_err)
-            self.assertTrue(
-                exit_code == 0, 'Failed to remove disk.' + str(std_out) + '\n' + str(std_err))
-
-        except Exception as exc:
-            LOG.exception(exc)
-            raise exc
+        LOG.info('Remove disk result: %s', s_out)
+        assert_msg = '%s\n%s\n%s' % ('Failed to remove disk.',
+                                     str(s_out), str(s_err))
+        self.assertTrue(e_code == 0, assert_msg)
 
     def detach_disk(self, instance_name, disk_name):
         """Detach a disk from a vm"""
 
-        cmd = 'powershell ' + self.script_folder
-        cmd += 'setupscripts\\detach-disk.ps1 -vmName ' + \
-            instance_name + ' -hvServer ' + \
-            self.host_name + ' -diskName ' + disk_name
+        script_location = "%s%s" % (self.script_folder,
+                                    'setupscripts\\detach-disk.ps1')
+        s_out, s_err, e_code = self.win_client.run_powershell_cmd(
+                                script_location,
+                                vmName=instance_name,
+                                hvServer=self.host_name,
+                                diskName=disk_name)
 
-        LOG.debug('Sending command %s', cmd)
-        try:
-            std_out, std_err, exit_code = self.win_client.run_wsman_cmd(cmd)
-            LOG.info('Detach disk:\nstd_out: ' + std_out)
-            LOG.debug('Command std_err: %s', std_err)
-            self.assertTrue(
-                exit_code == 0, 'Failed to detach disk.' + str(std_out) + '\n' + str(std_err))
-
-        except Exception as exc:
-            LOG.exception(exc)
-            raise exc
+        LOG.info('Detach disk result: %s', s_out)
+        assert_msg = '%s\n%s\n%s' % ('Failed to detach disk.',
+                                     str(s_out), str(s_err))
+        self.assertTrue(e_code == 0, assert_msg)
 
     def get_parent_disk_size(self, disk_name):
 
-        cmd = 'powershell ' + self.script_folder
-        cmd += 'setupscripts\\get-parent-disk-size.ps1 ' + \
-            ' -hvServer ' + self.host_name + ' -diskName ' + disk_name
+        script_location = "%s%s" % (self.script_folder,
+                                    'setupscripts\\get-parent-disk-size.ps1')
+        s_out, s_err, e_code = self.win_client.run_powershell_cmd(
+                                script_location,
+                                hvServer=self.host_name,
+                                diskName=disk_name)
 
-        LOG.debug('Sending command %s', cmd)
-        try:
-            std_out, std_err, exit_code = self.win_client.run_wsman_cmd(cmd)
-            LOG.info('Detach disk:\nstd_out: ' + std_out)
-            LOG.debug('Command std_err: %s', std_err)
-            self.assertTrue(
-                exit_code == 0, 'Failed to get parent disk size.' + str(std_out) + '\n' + str(std_err))
-            return int(std_out)
-        except Exception as exc:
-            LOG.exception(exc)
-            raise exc
+        LOG.info('Get parent disk size result: %s', s_out)
+        assert_msg = '%s\n%s\n%s' % ('Failed to get parent disk size.',
+                                     str(s_out), str(s_err))
+        self.assertTrue(e_code == 0, assert_msg)
+        return int(s_out)
 
     def change_cpu(self, instance_name, new_cpu_count):
-        """Detach a disk from a vm"""
+        """Change the vcpu of a vm"""
 
-        cmd = 'powershell Set-VM -Name ' + instance_name + ' -ComputerName ' + \
-            self.host_name + ' -ProcessorCount ' + str(new_cpu_count)
-
-        LOG.debug('Sending command %s', cmd)
-        try:
-            std_out, std_err, exit_code = self.win_client.run_wsman_cmd(cmd)
-
-        except Exception as exc:
-            LOG.exception(exc)
-            raise exc
-
-        LOG.info('Detach disk:\nstd_out: ' + std_out)
-        LOG.debug('Command std_err: %s', std_err)
-        self.assertFalse(exit_code != 0)
-
-    def take_revert_snapshot(self, instance_name, snapshot_name='LisTest'):
-        cmd = 'powershell ' + self.script_folder
-        cmd += 'setupscripts\\STOR_TakeRevert_Snapshot.ps1 ' + \
-            ' -hvServer ' + self.host_name + ' -vmName ' + \
-            instance_name + ' -snapshotName ' + snapshot_name
-        LOG.debug('Sending command %s', cmd)
-        try:
-            std_out, std_err, exit_code = self.win_client.run_wsman_cmd(cmd)
-            LOG.info('Detach disk:\nstd_out: ' + std_out)
-            LOG.debug('Command std_err: %s', std_err)
-            self.assertTrue(
-                exit_code == 0, 'Failed to take and revert snapshot.')
-        except Exception as exc:
-            LOG.exception(exc)
-            raise exc
+        s_out, s_err, e_code = self.win_client.run_powershell_cmd(
+                                'Set-VM',
+                                ComputerName=self.host_name,
+                                Name=instance_name,
+                                ProcessorCount=new_cpu_count)
+        LOG.info('Change vcpu result: %s', s_out)
+        assert_msg = '%s\n%s\n%s' % ('Failed to change vcpu.',
+                                     str(s_out), str(s_err))
+        self.assertTrue(e_code == 0, assert_msg)
 
     def take_snapshot(self, instance_name, snapshot_name):
-        cmd = 'powershell Checkpoint-VM -Name ' + instance_name + ' -ComputerName ' + \
-            self.host_name + ' -SnapshotName ' + snapshot_name
-        LOG.debug('Sending command %s', cmd)
-        try:
-            std_out, std_err, exit_code = self.win_client.run_wsman_cmd(cmd)
-            LOG.debug('Command std_err: %s', std_err)
-            self.assertTrue(
-                exit_code == 0, 'Failed to take snapshot.' + str(std_out) + '\n' + str(std_err))
-        except Exception as exc:
-            LOG.exception(exc)
-            raise exc
+        """ Take a snapshot of a VM. """
+
+        s_out, s_err, e_code = self.win_client.run_powershell_cmd(
+                                'Checkpoint-VM',
+                                ComputerName=self.host_name,
+                                Name=instance_name,
+                                SnapshotName=snapshot_name)
+        LOG.info('Take snapshot result: %s', s_out)
+        assert_msg = '%s\n%s\n%s' % ('Failed to take snapshot.',
+                                     str(s_out), str(s_err))
+        self.assertTrue(e_code == 0, assert_msg)
 
     def revert_snapshot(self, instance_name, snapshot_name):
-        cmd = 'powershell Restore-VMSnapshot -VMName ' + instance_name + ' -ComputerName ' + \
-            self.host_name + ' -Name ' + snapshot_name + '  -Confirm:$false'
-        LOG.debug('Sending command %s', cmd)
-        try:
-            std_out, std_err, exit_code = self.win_client.run_wsman_cmd(cmd)
-            LOG.debug('Command std_err: %s', std_err)
-            self.assertTrue(
-                exit_code == 0, 'Failed to revert snapshot.' + str(std_out) + '\n' + str(std_err))
-        except Exception as exc:
-            LOG.exception(exc)
-            raise exc
+        """ Revert specified VM to specified snapshot. """
+
+        s_out, s_err, e_code = self.win_client.run_powershell_cmd(
+                                'Restore-VMSnapshot',
+                                ComputerName=self.host_name,
+                                VMName=instance_name,
+                                Name=snapshot_name,
+                                Confirm='$false')
+        LOG.info('Revert snapshot result: %s', s_out)
+        assert_msg = '%s\n%s\n%s' % ('Failed to revert to snapshot.',
+                                     str(s_out), str(s_err))
+        self.assertTrue(e_code == 0, assert_msg)
+
+    def verify_heartbeat(self, instance_name):
+
+        cmd = 'powershell -Command $(Get-VMIntegrationService \
+               -ComputerName %s -VMName %s -Name Heartbeat).Enabled' % (
+                self.host_name, instance_name)
+        s_out, s_err, e_code = self.win_client.run_wsman_cmd(cmd)
+        LOG.info('Command std_out: %s', s_out)
+        self.assertTrue(
+            "True" in s_out, 'Heartbeat status %s ' % s_out)
 
     def format_disk(self, expected_disk_count, filesystem):
         try:
@@ -2731,22 +2703,4 @@ class LisBase(ScenarioTest):
         except Exception as exc:
             LOG.exception(exc)
             self._log_console_output()
-            raise exc
-
-    def verify_heartbeat(self, instance_name):
-        cmd = 'powershell -Command $(Get-VMIntegrationService -ComputerName ' + \
-            self.host_name + ' -VMName ' + \
-            instance_name + ' -Name Heartbeat).Enabled'
-
-        LOG.debug('Sending command %s', cmd)
-        try:
-            import pdb
-            pdb.set_trace()
-            std_out, std_err, exit_code = self.win_client.run_wsman_cmd(cmd)
-
-            LOG.debug('Command std_out: %s', std_out)
-            LOG.debug('Command std_err: %s', std_err)
-            self.assertTrue("True" in std_out, 'Heartbeat status %s ' % std_out)
-        except Exception as exc:
-            LOG.exception(exc)
             raise exc

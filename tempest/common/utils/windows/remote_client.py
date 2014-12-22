@@ -18,7 +18,11 @@
 import getopt
 import sys
 
+from tempest.openstack.common import log
 from winrm import protocol
+
+
+LOG = log.getLogger(__name__)
 
 
 class WinRemoteClient(object):
@@ -49,6 +53,7 @@ class WinRemoteClient(object):
             return (std_out, std_err, status_code)
 
         except Exception as exc:
+            LOG.exception(exc)
             raise exc
 
     def run_wsman_script(self, script):
@@ -85,3 +90,8 @@ class WinRemoteClient(object):
                 std_out, std_err, exit_code = wsmancmd.run_wsman_cmd('')
                 wsmancmd.run_wsman_cmd('')
 
+    def run_powershell_cmd(self, *args, **kvargs):
+        list_args = " ".join(args)
+        kv_args = " ".join(["-%s %s" % (k, v) for k, v in kvargs.iteritems()])
+        full_cmd = "%s %s %s" % ('powershell' , list_args, kv_args)
+        return self.run_wsman_cmd(full_cmd)
