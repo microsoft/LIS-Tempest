@@ -18,3 +18,9 @@ build
 !.coveragerc
 cover/
 .com.apple.timemachine.supported
+etc/tempest.conf
+logs_tests/
+test_lists/
+subunit2html.py
+results.html
+
