@@ -22,7 +22,17 @@ build
 .coverage*
 !.coveragerc
 cover/
+<<<<<<< HEAD
 doc/source/_static/tempest.conf.sample
 
 # Files created by releasenotes build
 releasenotes/build
+=======
+.com.apple.timemachine.supported
+etc/tempest.conf
+logs_tests/
+test_lists/
+subunit2html.py
+results.html
+
+>>>>>>> Minor cleanup
