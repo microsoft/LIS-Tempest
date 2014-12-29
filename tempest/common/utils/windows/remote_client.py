@@ -95,3 +95,10 @@ class WinRemoteClient(object):
         kv_args = " ".join(["-%s %s" % (k, v) for k, v in kvargs.iteritems()])
         full_cmd = "%s %s %s" % ('powershell' , list_args, kv_args)
         return self.run_wsman_cmd(full_cmd)
+
+    def get_powershell_cmd_attribute(self, *args, **kvargs):
+        cmd = args[0]
+        attribute = args[1]
+        kv_args = " ".join(["-%s %s" % (k, v) for k, v in kvargs.iteritems()])
+        full_cmd = "%s (%s %s).%s" % ('powershell' , cmd, kv_args, attribute)
+        return self.run_wsman_cmd(full_cmd)
