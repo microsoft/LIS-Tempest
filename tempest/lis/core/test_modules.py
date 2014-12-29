@@ -12,7 +12,6 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import pdb
 import os
 from tempest import config
 from tempest.openstack.common import log as logging
@@ -20,6 +19,7 @@ from tempest.common.utils.windows.remote_client import WinRemoteClient
 from tempest.lis import manager
 from tempest.scenario import utils as test_utils
 from tempest import test
+from tempest import exceptions
 
 CONF = config.CONF
 
@@ -91,23 +91,46 @@ class LisModules(manager.LisBase):
         self.nova_floating_ip_add()
         self.server_id = self.instance['id']
 
+    def check_lis_modules(self):
+        try:
+            script_name = 'LIS_verifyHyperVIC.sh'
+            script_path = '/scripts/' + script_name
+            destination = '/root/'
+            my_path = os.path.abspath(
+                os.path.normpath(os.path.dirname(__file__)))
+            full_script_path = my_path + script_path
+            cmd_params = []
+            self.linux_client.execute_script(
+                script_name, cmd_params, full_script_path, destination)
+
+        except exceptions.SSHExecCommandFailed as exc:
+
+            LOG.exception(exc)
+            self._log_console_output()
+            raise exc
+
+        except Exception as exc:
+            LOG.exception(exc)
+            self._log_console_output()
+            raise exc
+
+    def reload_modules(self):
+        """Not yet implemented"""
+        pass
+
     @test.attr(type=['smoke', 'core', 'lis_modules'])
     @test.services('compute', 'network')
     def test_lis_modules_presence(self):
         self.spawn_vm()
         self._initiate_linux_client(self.floating_ip['ip'], self.image_utils.ssh_user(
             self.image_ref), self.keypair['private_key'])
-        output = self.linux_client.verify_lis_modules()
-        LOG.info('Found %s lis modules', output)
-        self.assertTrue(output == 4, 'Found %s modules' % output)
-        self.servers_client.delete_server(self.instance['id'])
+        self.check_lis_modules()
 
-    @test.attr(type=['smoke', 'core', 'lis_modules'])
+    @test.attr(type=['core', 'lis_modules'])
     @test.services('compute', 'network')
     def test_lis_reload_modules(self):
         self.spawn_vm()
         self._initiate_linux_client(self.floating_ip['ip'], self.image_utils.ssh_user(
             self.image_ref), self.keypair['private_key'])
-        output = self.linux_client.reload_modules()
-        # self.assertTrue(output > 0, 'Found %s modules' % output)
+        output = self.reload_modules()
         self.servers_client.delete_server(self.instance['id'])

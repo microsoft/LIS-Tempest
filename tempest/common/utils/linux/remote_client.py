@@ -170,7 +170,6 @@ class RemoteClient():
         return self.exec_command(cmd)
 
     def execute_script(self, cmd, cmd_params, source, destination):
-        self.exec_command('ls')
         self.copy_over(source, destination)
         self.exec_command(
             'cd ' + destination + '; dos2unix ' + cmd)

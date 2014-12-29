@@ -131,7 +131,7 @@ class Client(object):
                 LOG.info(
                     "Successfuly copied over %s to %s", source, destination)
         except Exception as e:
-            raise '*** Caught exception: %s: %s' % (e.__class__, e)
+            raise Exception ('*** Failed to sftp: %s: %s' % (e.__class__, e))
             try:
                 transport.close()
             except:
