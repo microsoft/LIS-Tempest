@@ -1,5 +1,4 @@
 # Copyright 2014 Cloudbase Solutions Srl
-# All rights reserved
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
 #    not use this file except in compliance with the License. You may obtain
@@ -13,10 +12,13 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import pdb
+import os
 from tempest import config
-from tempest.common import debug
-from tempest.lis import manager
 from tempest.openstack.common import log as logging
+from tempest.common.utils import data_utils
+from tempest.common.utils.windows.remote_client import WinRemoteClient
+from tempest.lis import manager
 from tempest.scenario import utils as test_utils
 from tempest import test
 
@@ -27,22 +29,10 @@ LOG = logging.getLogger(__name__)
 load_tests = test_utils.load_tests_input_scenario_utils
 
 
-class TestLis(manager.ScenarioTest):
-
-    """
-    This smoke test case follows this basic set of operations:
-
-     * Create a keypair for use in launching an instance
-     * Create a security group to control network access in instance
-     * Add simple permissive rules to the security group
-     * Launch an instance
-     * Pause/unpause the instance
-     * Suspend/resume the instance
-     * Terminate the instance
-    """
+class Reboot(manager.LisBase):
 
     def setUp(self):
-        super(TestLis, self).setUp()
+        super(Reboot, self).setUp()
         # Setup image and flavor the test instance
         # Support both configured and injected values
         if not hasattr(self, 'image_ref'):
@@ -57,6 +47,8 @@ class TestLis(manager.ScenarioTest):
                     image=self.image_ref, flavor=self.flavor_ref
                 )
             )
+        self.host_name = ""
+        self.instance_name = ""
         self.run_ssh = CONF.compute.run_ssh and \
             self.image_utils.is_sshable_image(self.image_ref)
         self.ssh_user = self.image_utils.ssh_user(self.image_ref)
@@ -64,12 +56,6 @@ class TestLis(manager.ScenarioTest):
                   'Run ssh: {ssh}, user: {ssh_user}'.format(
                       image=self.image_ref, flavor=self.flavor_ref,
                       ssh=self.run_ssh, ssh_user=self.ssh_user))
-
-    def _wait_for_server_status(self, status):
-        instance_id = self.instance['id']
-        # Raise on error defaults to True, which is consistent with the
-        # original function from scenario tests here
-        self.servers_client.wait_for_server_status(instance_id, status)
 
     def add_keypair(self):
         self.keypair = self.create_keypair()
@@ -84,10 +70,9 @@ class TestLis(manager.ScenarioTest):
         self.instance = self.create_server(image=self.image_ref,
                                            flavor=self.flavor_ref,
                                            create_kwargs=create_kwargs)
-
-    def nova_reboot(self):
-        self.servers_client.reboot(self.instance['id'], 'SOFT')
-        self._wait_for_server_status('ACTIVE')
+        self.instance_name = self.instance["OS-EXT-SRV-ATTR:instance_name"]
+        self.host_name = self.instance["OS-EXT-SRV-ATTR:hypervisor_hostname"]
+        self._initiate_win_client(self.host_name)
 
     def nova_floating_ip_create(self):
         _, self.floating_ip = self.floating_ips_client.create_floating_ip()
@@ -99,35 +84,59 @@ class TestLis(manager.ScenarioTest):
         self.floating_ips_client.associate_floating_ip_to_server(
             self.floating_ip['ip'], self.instance['id'])
 
-    def ssh_to_server(self):
-        try:
-            linux_client = self.get_remote_client(
-                server_or_ip=self.floating_ip['ip'],
-                username=self.image_utils.ssh_user(self.image_ref),
-                private_key=self.keypair['private_key'])
-        except Exception as e:
-            LOG.exception('ssh to server failed')
-            self._log_console_output()
-            # network debug is called as part of ssh init
-            if not isinstance(e, test.exceptions.SSHTimeout):
-                debug.log_net_debug()
-            raise
-
-    def several_reboot(self, count):
-        try:
-            for _ in range(count):
-                self.ssh_to_server()
-                self.nova_reboot()
-        except Exception as e:
-            LOG.exception('Reboot failed at iteration %d', _)
-            raise
-
-    @test.services('compute', 'network')
-    def test_multiple_reboot(self):
+    def spawn_vm(self):
         self.add_keypair()
         self.security_group = self._create_security_group()
         self.boot_instance()
         self.nova_floating_ip_create()
         self.nova_floating_ip_add()
-        self.several_reboot(2)
-        self.servers_client.delete_server(self.instance['id'])
+        self.server_id = self.instance['id']
+
+    def create_flavor(self, new_ram):
+        _, c_f = self.flavor_client.get_flavor_details(self.flavor_ref)
+        self.assertEqual(_.status, 200)
+        name = data_utils.rand_name('flavor')
+        f_id = data_utils.rand_int_id(start=1000)
+        _, new_f = self.flavor_client.create_flavor(name=name, ram=new_ram, vcpus=int(c_f['vcpus']), disk=int(c_f['disk']), flavor_id=f_id)
+        self.assertEqual(_.status, 200)
+        self.addCleanup(self.flavor_client.delete_flavor, new_f['id'])
+        return new_f['id']
+
+    def _test_reboot_native(self, mem_settings):
+        """ Currently resize failing """
+        for memory in mem_settings:
+            new_flavor = self.create_flavor(memory)
+            self.servers_client.resize(self.server_id, new_flavor)
+            self.servers_client.wait_for_server_status(self.server_id,
+                                                   'VERIFY_RESIZE')
+            self.servers_client.confirm_resize(self.server_id)
+            self.servers_client.reboot(self.server_id, 'SOFT')
+            self._wait_for_server_status('ACTIVE')
+
+    def _test_reboot(self, mem_settings):
+        for memory in mem_settings:
+            self.servers_client.stop(self.server_id)
+            self.servers_client.wait_for_server_status(self.server_id, 'SHUTOFF')
+            self.set_ram_settings(self.instance_name, memory)
+            self.servers_client.start(self.server_id)
+            self.servers_client.wait_for_server_status(self.server_id, 'ACTIVE')
+            try:
+                self.linux_client.ping_host('127.0.0.1')
+
+            except exceptions.SSHExecCommandFailed as exc:
+                LOG.exception(exc)
+                raise exc
+
+    @test.attr(type=['core'])
+    @test.services('compute', 'network')
+    def test_reboot_various_mem(self):
+        self.spawn_vm()
+        self._initiate_linux_client(self.floating_ip['ip'], self.image_utils.ssh_user(
+            self.image_ref), self.keypair['private_key'])
+        """
+        Get back to this approach once resize is fixed
+        mem_settings = [2048, 3584, 4608, 6144]
+        self._test_reboot_native(mem_settings)
+        """
+        mem_settings = [2048, 3584, 4608]
+        self._test_reboot(mem_settings)

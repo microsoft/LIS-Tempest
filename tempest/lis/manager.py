@@ -96,6 +96,7 @@ class ScenarioTest(tempest.test.BaseTestCase):
         cls.interface_client = cls.manager.interfaces_client
         # Neutron network client
         cls.network_client = cls.manager.network_client
+        cls.flavor_client = cls.manager.flavors_client
 
     @classmethod
     def tearDownClass(cls):
@@ -2645,6 +2646,17 @@ class LisBase(ScenarioTest):
         LOG.info('Command std_out: %s', s_out)
         self.assertTrue(
             "True" in s_out, 'Heartbeat status %s ' % s_out)
+
+    def set_ram_settings(self, instance_name, new_memory):
+        s_out, s_err, e_code = self.win_client.run_powershell_cmd(
+                                'Set-VMMemory',
+                                ComputerName=self.host_name,
+                                VMName=instance_name,
+                                StartupBytes =new_memory*1024*1024)
+        LOG.info('Set new ram settings result: %s', s_out)
+        assert_msg = '%s\n%s\n%s' % ('Failed to set new ram settings.',
+                                     str(s_out), str(s_err))
+        self.assertTrue(e_code == 0, assert_msg)
 
     def format_disk(self, expected_disk_count, filesystem):
         try:
