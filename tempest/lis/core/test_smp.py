@@ -1,5 +1,4 @@
 # Copyright 2014 Cloudbase Solutions Srl
-# All rights reserved
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
 #    not use this file except in compliance with the License. You may obtain
@@ -13,10 +12,11 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import os
 from tempest import config
+from tempest.openstack.common import log as logging
 from tempest.common.utils.windows.remote_client import WinRemoteClient
 from tempest.lis import manager
-from tempest.openstack.common import log as logging
 from tempest.scenario import utils as test_utils
 from tempest import test
 
@@ -27,22 +27,10 @@ LOG = logging.getLogger(__name__)
 load_tests = test_utils.load_tests_input_scenario_utils
 
 
-class TestLis(manager.ScenarioTest):
-
-    """
-    This smoke test case follows this basic set of operations:
-
-     * Create a keypair for use in launching an instance
-     * Create a security group to control network access in instance
-     * Add simple permissive rules to the security group
-     * Launch an instance
-     * Pause/unpause the instance
-     * Suspend/resume the instance
-     * Terminate the instance
-    """
+class ISS(manager.LisBase):
 
     def setUp(self):
-        super(TestLis, self).setUp()
+        super(ISS, self).setUp()
         # Setup image and flavor the test instance
         # Support both configured and injected values
         if not hasattr(self, 'image_ref'):
@@ -57,6 +45,8 @@ class TestLis(manager.ScenarioTest):
                     image=self.image_ref, flavor=self.flavor_ref
                 )
             )
+        self.host_name = ""
+        self.instance_name = ""
         self.run_ssh = CONF.compute.run_ssh and \
             self.image_utils.is_sshable_image(self.image_ref)
         self.ssh_user = self.image_utils.ssh_user(self.image_ref)
@@ -64,19 +54,6 @@ class TestLis(manager.ScenarioTest):
                   'Run ssh: {ssh}, user: {ssh_user}'.format(
                       image=self.image_ref, flavor=self.flavor_ref,
                       ssh=self.run_ssh, ssh_user=self.ssh_user))
-
-        self.host_username = CONF.host_credentials.host_user_name
-        self.host_password = CONF.host_credentials.host_password
-
-    def create_flavor(self):
-        resp, flavor = self.client.create_flavor(flavor_name,
-                                                  ram, vcpus,
-                                                  self.disk,
-                                                  flavor_id,
-                                                  ephemeral=self.ephemeral,
-                                                  swap=self.swap,
-                                                  rxtx=self.rxtx)
-        self.addCleanup(self.flavor_clean_up, flavor['id'])
 
     def add_keypair(self):
         self.keypair = self.create_keypair()
@@ -91,19 +68,9 @@ class TestLis(manager.ScenarioTest):
         self.instance = self.create_server(image=self.image_ref,
                                            flavor=self.flavor_ref,
                                            create_kwargs=create_kwargs)
-
         self.instance_name = self.instance["OS-EXT-SRV-ATTR:instance_name"]
         self.host_name = self.instance["OS-EXT-SRV-ATTR:hypervisor_hostname"]
-        self._initiate_wsman(self.host_name)
-
-    def _initiate_wsman(self, host_name):
-        try:
-            self.wsmancmd = WinRemoteClient(
-                host_name, self.host_username, self.host_password)
-
-        except Exception as exc:
-            LOG.exception(exc)
-            raise exc
+        self._initiate_win_client(self.host_name)
 
     def nova_floating_ip_create(self):
         _, self.floating_ip = self.floating_ips_client.create_floating_ip()
@@ -115,49 +82,37 @@ class TestLis(manager.ScenarioTest):
         self.floating_ips_client.associate_floating_ip_to_server(
             self.floating_ip['ip'], self.instance['id'])
 
-    def change_cpu(self, cpu_count):
-        cmd = 'powershell -Command Set-VM '
-        cmd += '-Name %s ' % self.instance_name
-        cmd +='-ComputerName %s ' % self.host_name
-        cmd += '-ProcessorCount %d' % cpu_count
-        LOG.debug('Sending command %s', cmd)
-        try:
-            std_out, std_err, exit_code = self.wsmancmd.run_wsman_cmd(cmd)
-            self.assertEqual(0, exit_code)
-        except Exception as exc:
-            LOG.exception(exc)
-            raise exc
-
-        LOG.debug('Command std_out: %s', std_out)
-        LOG.debug('Command std_err: %s', std_err)
-
-    def verify_cpu(self, expected):
-        try:
-            linux_client = self.get_remote_client(
-                server_or_ip=self.floating_ip['ip'],
-                username=self.image_utils.ssh_user(self.image_ref),
-                private_key=self.keypair['private_key'])
-            output = linux_client.get_cpu_count()
-            LOG.info('Found %s cpu\'s', output)
-            self.assertEqual(expected, output)
-        except Exception:
-            LOG.exception('ssh to server failed')
-            self._log_console_output()
-            raise
-
-    @test.services('compute', 'network')
-    def test_lis_smp(self):
+    def spawn_vm(self):
         self.add_keypair()
         self.security_group = self._create_security_group()
         self.boot_instance()
         self.nova_floating_ip_create()
         self.nova_floating_ip_add()
-        self.verify_cpu(2)
-        server_id = self.instance['id']
-        self.servers_client.stop(server_id)
-        self.servers_client.wait_for_server_status(server_id, 'SHUTOFF')
-        self.change_cpu(4)
-        self.servers_client.start(server_id)
-        self.servers_client.wait_for_server_status(server_id, 'ACTIVE')
-        self.verify_cpu(4)
-        self.servers_client.delete_server(self.instance['id'])
+        self.server_id = self.instance['id']
+
+    def _test_shutdown_multi_cpu(self, max_cpu):
+        for _ in range(2, max_cpu):
+            self.servers_client.stop(self.server_id)
+            self.servers_client.wait_for_server_status(self.server_id, 'SHUTOFF')
+            self.change_cpu(self.instance_name, _)
+            self.servers_client.start(self.server_id)
+            self.servers_client.wait_for_server_status(self.server_id, 'ACTIVE')
+            vcpu_count = self.linux_client.get_number_of_vcpus()
+            self.assertTrue(vcpu_count == _ , "Expected %s , actual %s" % (_, vcpu_count))
+
+    @test.attr(type=['smoke', 'core', 'smp'])
+    @test.services('compute', 'network')
+    def test_shutdown_smp(self):
+        self.spawn_vm()
+        self._initiate_linux_client(self.floating_ip['ip'], self.image_utils.ssh_user(
+            self.image_ref), self.keypair['private_key'])
+        self._test_shutdown_multi_cpu(5)
+
+    @test.attr(type=['core', 'smp'])
+    @test.services('compute', 'network')
+    def test_shutdown_multi_cpu(self):
+        self.spawn_vm()
+        self._initiate_linux_client(self.floating_ip['ip'], self.image_utils.ssh_user(
+            self.image_ref), self.keypair['private_key'])
+        self._test_shutdown_multi_cpu(5)
+
