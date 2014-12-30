@@ -2658,6 +2658,18 @@ class LisBase(ScenarioTest):
                                      str(s_out), str(s_err))
         self.assertTrue(e_code == 0, assert_msg)
 
+    def check_heartbeat_status(self):
+        s_out, s_err, e_code = self.win_client.get_powershell_cmd_attribute(
+            'Get-VMIntegrationService', 'PrimaryStatusDescription',
+            ComputerName=self.host_name,
+            VMName=self.instance_name,
+            Name='Heartbeat')
+        LOG.info('Status of Heartbeat: %s', s_out)
+        assert_msg = '%s\n%s\n%s' % ('Failed to get heartbeat status.',
+                                     str(s_out), str(s_err))
+        self.assertTrue(e_code == 0, assert_msg)
+        self.assertTrue(s_out.lower() != 'lost communication', assert_msg)
+
     def format_disk(self, expected_disk_count, filesystem):
         try:
             script_name = 'STOR_Lis_Disk.sh'
