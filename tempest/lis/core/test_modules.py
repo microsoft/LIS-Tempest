@@ -13,6 +13,7 @@
 #    under the License.
 
 import os
+from time import sleep
 from tempest import config
 from tempest.openstack.common import log as logging
 from tempest.common.utils.windows.remote_client import WinRemoteClient
@@ -115,8 +116,36 @@ class LisModules(manager.LisBase):
             raise exc
 
     def reload_modules(self):
-        """Not yet implemented"""
-        pass
+        try:
+            script_name = 'CORE_StressReloadModules.sh'
+            script_path = '/scripts/' + script_name
+            destination = '/root/'
+            my_path = os.path.abspath(
+                os.path.normpath(os.path.dirname(__file__)))
+            full_script_path = my_path + script_path
+            cmd_params = []
+            self.linux_client.execute_script(
+                script_name, cmd_params, full_script_path, destination)
+
+        except exceptions.TimeoutException as exc:
+            max_attempts = 5
+            while max_attempts:
+                try:
+                    self.linux_client.verify_file('reload_finished')
+                    self.check_heartbeat_status()
+                    break
+                except exceptions.SSHTimeout as exc:
+                    self.check_heartbeat_status()
+                    max_attempts -= 1
+                    continue
+
+            self.assertFalse(
+                max_attempts == 0, 'Stress reload modules timed out.')
+
+        except Exception as exc:
+            LOG.exception(exc)
+            self._log_console_output()
+            raise exc
 
     @test.attr(type=['smoke', 'core', 'lis_modules'])
     @test.services('compute', 'network')
@@ -132,5 +161,5 @@ class LisModules(manager.LisBase):
         self.spawn_vm()
         self._initiate_linux_client(self.floating_ip['ip'], self.image_utils.ssh_user(
             self.image_ref), self.keypair['private_key'])
-        output = self.reload_modules()
+        self.reload_modules()
         self.servers_client.delete_server(self.instance['id'])
