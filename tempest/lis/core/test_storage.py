@@ -12,7 +12,6 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import pdb
 import os
 from tempest import config
 from tempest.openstack.common import log as logging
@@ -28,7 +27,7 @@ LOG = logging.getLogger(__name__)
 load_tests = test_utils.load_tests_input_scenario_utils
 
 
-class Storage(manager.LisBase):
+class StorageBase(manager.LisBase):
 
     """
     This smoke test case follows this basic set of operations:
@@ -43,7 +42,7 @@ class Storage(manager.LisBase):
     """
 
     def setUp(self):
-        super(Storage, self).setUp()
+        super(StorageBase, self).setUp()
         # Setup image and flavor the test instance
         # Support both configured and injected values
         if not hasattr(self, 'image_ref'):
@@ -107,7 +106,6 @@ class Storage(manager.LisBase):
         self.server_id = self.instance['id']
 
     def _test_storage(self, pos, vhd_type, expected_disk_count, filesystem):
-
         self.spawn_vm()
         self.servers_client.stop(self.server_id)
         self.servers_client.wait_for_server_status(self.server_id, 'SHUTOFF')
@@ -298,6 +296,25 @@ class Storage(manager.LisBase):
         self.assertEqual(disk_count, 1)
         self.servers_client.delete_server(self.instance['id'])
 
+    def _test_pass_ide(self, pos, expected_disk_count, filesystem):
+        self.spawn_vm()
+        self.servers_client.stop(self.server_id)
+        self.servers_client.wait_for_server_status(self.server_id, 'SHUTOFF')
+        if isinstance(pos, list):
+            for position in pos:
+                self.add_pass_disk(
+                    self.instance_name, position)
+        else:
+            self.add_pass_disk(
+                self.instance_name, pos)
+        self.servers_client.start(self.server_id)
+        self.servers_client.wait_for_server_status(self.server_id, 'ACTIVE')
+
+        self._initiate_linux_client(self.floating_ip['ip'], self.image_utils.ssh_user(
+            self.image_ref), self.keypair['private_key'])
+        self.format_disk(expected_disk_count, filesystem)
+        self.servers_client.delete_server(self.instance['id'])
+
     def _test_diff_disk(self, pos):
         self.spawn_vm()
         self.servers_client.stop(self.server_id)
@@ -343,6 +360,22 @@ class Storage(manager.LisBase):
         position = ('IDE', 1, 1)
         self._test_storage(position, 'Fixed', 1, self.file_system)
 
+    def _test_storage_pass_ide_0(self):
+        position = ('IDE', 0, 1)
+        self._test_pass_ide(position, 1, self.file_system)
+
+    def _test_storage_pass_ide_1(self):
+        position = ('IDE', 1, 1)
+        self._test_pass_ide(position, 1, self.file_system)
+
+    def _test_storage_pass_multiple_ide_0(self):
+        positions = [('IDE', 0, 1), ('IDE', 1, 1)]
+        self._test_pass_ide(positions, 2, self.file_system)
+
+    def _test_storage_pass_multiple_ide_1(self):
+        positions = [('IDE', 0, 1), ('IDE', 1, 1)]
+        self._test_pass_ide(positions, 2, self.file_system)
+
     def _test_storage_pass_scsi(self):
         count = ['b']
         self._test_add_passthrough(count, 1, self.file_system)
@@ -363,11 +396,11 @@ class Storage(manager.LisBase):
         position = ('SCSI', 1, 1)
         self._test_storage(position, 'Fixed', 1, self.file_system)
 
-    def _test_storage_dynamic_ide_controller_1(self):
+    def _test_storage_dynamic_ide_1(self):
         position = ('IDE', 1, 1)
         self._test_storage(position, 'Dynamic', 1, self.file_system)
 
-    def _test_storage_dynamic_ide_controller_0(self):
+    def _test_storage_dynamic_ide_0(self):
         position = ('IDE', 0, 1)
         self._test_storage(position, 'Dynamic', 1, self.file_system)
 
@@ -375,11 +408,11 @@ class Storage(manager.LisBase):
         position = ('SCSI', 0, 1)
         self._test_storage(position, 'Dynamic', 1, self.file_system)
 
-    def _test_storage_multiple_ide_controller_0(self):
+    def _test_storage_multiple_ide_0(self):
         positions = [('IDE', 0, 1), ('IDE', 1, 1)]
         self._test_storage(positions, 'Dynamic',  2, self.file_system)
 
-    def _test_storage_multiple_ide_controller_1(self):
+    def _test_storage_multiple_ide_1(self):
         positions = [('IDE', 0, 1), ('IDE', 1, 1)]
         self._test_storage(positions, 'Dynamic', 2, self.file_system)
 
@@ -415,25 +448,51 @@ class Storage(manager.LisBase):
         position = ('SCSI', 1, 1)
         self._test_diff_disk(position)
 
+
+class Storage(StorageBase):
+
+    def setUp(self):
+        super(Storage, self).setUp()
+
     @test.attr(type=['smoke', 'core_storage', 'snapshot', 'SCSI'])
     @test.services('compute', 'network')
     def test_take_revert_snapshot_scsi(self):
         self._test_take_revert_snapshot()
 
 
-class TestVHD(Storage):
+class TestVHD(StorageBase):
 
     def setUp(self):
         super(TestVHD, self).setUp()
         self.disk_type = 'vhd'
         self.sector_size = 512
 
+    @test.attr(type=['smoke', 'core_storage', 'passthrough', 'IDE'])
+    @test.services('compute', 'network')
+    def test_passthrough_ide_0(self):
+        self._test_storage_pass_ide_0()
+
+    @test.attr(type=['smoke', 'core_storage', 'passthrough', 'IDE'])
+    @test.services('compute', 'network')
+    def test_passthrough_ide_1(self):
+        self._test_storage_pass_ide_1()
+
+    @test.attr(type=[ 'core_storage', 'passthrough', 'IDE'])
+    @test.services('compute', 'network')
+    def test_passthrough_multi_ide_0(self):
+        self._test_storage_pass_multiple_ide_0()
+
+    @test.attr(type=['core_storage', 'passthrough', 'IDE'])
+    @test.services('compute', 'network')
+    def test_passthrough_multi_ide_1(self):
+        self._test_storage_pass_multiple_ide_1()
+
     @test.attr(type=['smoke', 'core_storage', 'passthrough', 'SCSI'])
     @test.services('compute', 'network')
     def test_passthrough_scsi(self):
         self._test_storage_pass_scsi()
 
-    @test.attr(type=['core_storage', 'core_storage', 'passthrough', 'SCSI'])
+    @test.attr(type=[ 'core_storage', 'passthrough', 'SCSI'])
     @test.services('compute', 'network')
     def test_passthrough_multi_scsi(self):
         self._test_storage_multi_pass_scsi()
@@ -460,13 +519,13 @@ class TestVHD(Storage):
 
     @test.attr(type=['smoke', 'core_storage', 'vhd', 'dynamic', 'IDE'])
     @test.services('compute', 'network')
-    def test_storage_vhd_dynamic_ide_controller_1(self):
-        self._test_storage_dynamic_ide_controller_1()
+    def test_storage_vhd_dynamic_ide_1(self):
+        self._test_storage_dynamic_ide_1()
 
     @test.attr(type=['smoke', 'core_storage', 'vhd', 'dynamic', 'IDE'])
     @test.services('compute', 'network')
-    def test_storage_vhd_dynamic_ide_controller_0(self):
-        self._test_storage_dynamic_ide_controller_0()
+    def test_storage_vhd_dynamic_ide_0(self):
+        self._test_storage_dynamic_ide_0()
 
     @test.attr(type=['smoke', 'core_storage', 'vhd', 'dynamic', 'SCSI'])
     @test.services('compute', 'network')
@@ -475,13 +534,13 @@ class TestVHD(Storage):
 
     @test.attr(type=['smoke', 'core_storage', 'vhd', 'dynamic', 'IDE'])
     @test.services('compute', 'network')
-    def test_storage_multiple_vhd_ide_controller_0(self):
-        self._test_storage_multiple_ide_controller_0()
+    def test_storage_multiple_vhd_ide_0(self):
+        self._test_storage_multiple_ide_0()
 
     @test.attr(type=['smoke', 'core_storage', 'vhd', 'dynamic', 'IDE'])
     @test.services('compute', 'network')
-    def test_storage_multiple_vhd_ide_controller_1(self):
-        self._test_storage_multiple_ide_controller_1()
+    def test_storage_multiple_vhd_ide_1(self):
+        self._test_storage_multiple_ide_1()
 
     @test.attr(type=['smoke', 'core_storage', 'vhd', 'dynamic', 'SCSI'])
     @test.services('compute', 'network')
@@ -529,13 +588,8 @@ class TestVHD(Storage):
     def test_storage_vhd_differencing_scsi(self):
         self._test_diff_disk_scsi()
 
-    @test.services('compute', 'network')
-    def test_take_revert_snapshot_scsi(self):
-        skip_msg = ("Obsolete")
-        raise self.skipException(skip_msg)
 
-
-class TestVHDx(Storage):
+class TestVHDx(StorageBase):
 
     def setUp(self):
         super(TestVHDx, self).setUp()
@@ -554,13 +608,13 @@ class TestVHDx(Storage):
 
     @test.attr(type=['smoke', 'core_storage', 'vhdx', 'dynamic', 'IDE'])
     @test.services('compute', 'network')
-    def test_storage_vhdx_dynamic_ide_controller_1(self):
-        self._test_storage_dynamic_ide_controller_1()
+    def test_storage_vhdx_dynamic_ide_1(self):
+        self._test_storage_dynamic_ide_1()
 
     @test.attr(type=['smoke', 'core_storage', 'vhdx', 'dynamic', 'IDE'])
     @test.services('compute', 'network')
-    def test_storage_vhdx_dynamic_ide_controller_0(self):
-        self._test_storage_dynamic_ide_controller_0()
+    def test_storage_vhdx_dynamic_ide_0(self):
+        self._test_storage_dynamic_ide_0()
 
     @test.attr(type=['smoke', 'core_storage', 'vhdx', 'dynamic', 'SCSI'])
     @test.services('compute', 'network')
@@ -569,13 +623,13 @@ class TestVHDx(Storage):
 
     @test.attr(type=['core_storage', 'vhdx', 'dynamic', 'IDE'])
     @test.services('compute', 'network')
-    def test_storage_multiple_vhdx_ide_controller_0(self):
-        self._test_storage_multiple_ide_controller_0()
+    def test_storage_multiple_vhdx_ide_0(self):
+        self._test_storage_multiple_ide_0()
 
     @test.attr(type=['core_storage', 'vhdx', 'dynamic', 'IDE'])
     @test.services('compute', 'network')
-    def test_storage_multiple_vhdx_ide_controller_1(self):
-        self._test_storage_multiple_ide_controller_1()
+    def test_storage_multiple_vhdx_ide_1(self):
+        self._test_storage_multiple_ide_1()
 
     @test.attr(type=['smoke', 'core_storage', 'vhdx', 'dynamic', 'SCSI'])
     @test.services('compute', 'network')
@@ -617,12 +671,8 @@ class TestVHDx(Storage):
     def test_storage_vhdx_differencing_scsi(self):
         self._test_diff_disk_scsi()
 
-    @test.services('compute', 'network')
-    def test_take_revert_snapshot_scsi(self):
-        skip_msg = ("Obsolete")
-        raise self.skipException(skip_msg)
 
-class TestVHDx4K(Storage):
+class TestVHDx4K(StorageBase):
 
     def setUp(self):
         super(TestVHDx4K, self).setUp()
@@ -641,13 +691,13 @@ class TestVHDx4K(Storage):
 
     @test.attr(type=['core_storage', 'vhdx', 'dynamic', 'IDE'])
     @test.services('compute', 'network')
-    def test_storage_vhdx_4k_dynamic_ide_controller_1(self):
-        self._test_storage_dynamic_ide_controller_1()
+    def test_storage_vhdx_4k_dynamic_ide_1(self):
+        self._test_storage_dynamic_ide_1()
 
     @test.attr(type=['core_storage', 'vhdx', 'dynamic', 'IDE'])
     @test.services('compute', 'network')
-    def test_storage_vhdx_4k_dynamic_ide_controller_0(self):
-        self._test_storage_dynamic_ide_controller_0()
+    def test_storage_vhdx_4k_dynamic_ide_0(self):
+        self._test_storage_dynamic_ide_0()
 
     @test.attr(type=['core_storage', 'vhdx', 'dynamic', 'SCSI'])
     @test.services('compute', 'network')
@@ -656,13 +706,13 @@ class TestVHDx4K(Storage):
 
     @test.attr(type=['core_storage', 'vhdx', 'dynamic', 'IDE'])
     @test.services('compute', 'network')
-    def test_storage_multiple_vhdx_4k_ide_controller_0(self):
-        self._test_storage_multiple_ide_controller_0()
+    def test_storage_multiple_vhdx_4k_ide_0(self):
+        self._test_storage_multiple_ide_0()
 
     @test.attr(type=['core_storage', 'vhdx', 'dynamic', 'IDE'])
     @test.services('compute', 'network')
-    def test_storage_multiple_vhdx_4k_ide_controller_1(self):
-        self._test_storage_multiple_ide_controller_1()
+    def test_storage_multiple_vhdx_4k_ide_1(self):
+        self._test_storage_multiple_ide_1()
 
     @test.attr(type=['core_storage', 'vhdx', 'dynamic', 'SCSI'])
     @test.services('compute', 'network')
@@ -694,7 +744,3 @@ class TestVHDx4K(Storage):
     def test_storage_vhdx_4k_dynamic_hot_add_multi_scsi(self):
         self._test_storage_dynamic_hot_add_multi_scsi()
 
-    @test.services('compute', 'network')
-    def test_take_revert_snapshot_scsi(self):
-        skip_msg = ("Obsolete")
-        raise self.skipException(skip_msg)
