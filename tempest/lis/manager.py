@@ -2531,6 +2531,31 @@ class LisBase(ScenarioTest):
         self.disks.append(disk_name)
 
 
+    def add_pass_disk(self, instance_name, position):
+        """Create a passthrough disk and attach to VM"""
+        ctrl_type, ctrl_id, ctrl_loc = position
+        passthroughVhd = 'PassThrough'
+        script_location = "%s%s" % (self.script_folder,
+                                    'setupscripts\\attach-disk-pass.ps1')
+        s_out, s_err, e_code = self.win_client.run_powershell_cmd(
+                                script_location,
+                                vmName=instance_name,
+                                hvServer=self.host_name,
+                                controllerType=ctrl_type,
+                                controllerID=ctrl_id,
+                                Lun=ctrl_loc,
+                                vhdType=passthroughVhd)
+
+        LOG.info('Add disk result: %s', s_out)
+        assert_msg = '%s\n%s\n%s' % ('Failed to add disk.',
+                                     str(s_out), str(s_err))
+        self.assertTrue(e_code == 0, assert_msg)
+
+        disk_name = '-'.join([self.instance_name, ctrl_type,
+                            str(ctrl_id), str(ctrl_loc), passthroughVhd]) + '.*'
+        self.addCleanup(self.remove_disk, self.instance_name, disk_name)
+        self.disks.append(disk_name)
+
     def add_diff_disk(self, instance_name, position, vhd_type):
         """Attach diff Disk to VM"""
 
@@ -2600,6 +2625,21 @@ class LisBase(ScenarioTest):
         s_out, s_err, e_code = self.win_client.run_powershell_cmd(
                                 script_location,
                                 vmName=instance_name,
+                                hvServer=self.host_name,
+                                diskName=disk_name)
+
+        LOG.info('Detach disk result: %s', s_out)
+        assert_msg = '%s\n%s\n%s' % ('Failed to detach disk.',
+                                     str(s_out), str(s_err))
+        self.assertTrue(e_code == 0, assert_msg)
+
+    def make_passthrough_offline(self, disk_name):
+        """Detach a PassThrough disk from a vm"""
+
+        script_location = "%s%s" % (self.script_folder,
+                                    'setupscripts\\detach-pass-disk.ps1')
+        s_out, s_err, e_code = self.win_client.run_powershell_cmd(
+                                script_location,
                                 hvServer=self.host_name,
                                 diskName=disk_name)
 
