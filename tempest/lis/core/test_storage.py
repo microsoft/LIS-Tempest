@@ -315,6 +315,29 @@ class StorageBase(manager.LisBase):
         self.format_disk(expected_disk_count, filesystem)
         self.servers_client.delete_server(self.instance['id'])
 
+    def _test_pass_offline(self, pos, expected_disk_count, filesystem):
+        self.spawn_vm()
+        self.servers_client.stop(self.server_id)
+        self.servers_client.wait_for_server_status(self.server_id, 'SHUTOFF')
+        if isinstance(pos, list):
+            for position in pos:
+                self.add_pass_disk(
+                    self.instance_name, position)
+        else:
+            self.add_pass_disk(
+                self.instance_name, pos)
+        self.servers_client.start(self.server_id)
+        self.servers_client.wait_for_server_status(self.server_id, 'ACTIVE')
+
+        self._initiate_linux_client(self.floating_ip['ip'], self.image_utils.ssh_user(
+            self.image_ref), self.keypair['private_key'])
+        self.format_disk(expected_disk_count, filesystem)
+        for disk in self.disks:
+            self.make_passthrough_offline(disk)
+        disk_count = self.count_disks()
+        self.assertEqual(disk_count, 1)
+        self.servers_client.delete_server(self.instance['id'])
+
     def _test_diff_disk(self, pos):
         self.spawn_vm()
         self.servers_client.stop(self.server_id)
@@ -375,6 +398,10 @@ class StorageBase(manager.LisBase):
     def _test_storage_pass_multiple_ide_1(self):
         positions = [('IDE', 0, 1), ('IDE', 1, 1)]
         self._test_pass_ide(positions, 2, self.file_system)
+
+    def _test_storage_pass_offline(self):
+        position = ('SCSI', 0, 1)
+        self._test_pass_offline(position, 1, self.file_system)
 
     def _test_storage_pass_scsi(self):
         count = ['b']
@@ -486,6 +513,11 @@ class TestVHD(StorageBase):
     @test.services('compute', 'network')
     def test_passthrough_multi_ide_1(self):
         self._test_storage_pass_multiple_ide_1()
+
+    @test.attr(type=['core_storage', 'passthrough'])
+    @test.services('compute', 'network')
+    def test_passthrough_offline(self):
+        self._test_storage_pass_offline()
 
     @test.attr(type=['smoke', 'core_storage', 'passthrough', 'SCSI'])
     @test.services('compute', 'network')
