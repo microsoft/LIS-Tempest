@@ -12,13 +12,11 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import pdb
-import os
 from tempest import config
 from tempest.openstack.common import log as logging
-from tempest.common.utils.windows.remote_client import WinRemoteClient
 from tempest.lis import manager
 from tempest.scenario import utils as test_utils
+from tempest import exceptions
 from tempest import test
 
 CONF = config.CONF
@@ -50,7 +48,7 @@ class ISS(manager.LisBase):
         self.instance_name = ""
         self.run_ssh = CONF.compute.run_ssh and \
             self.image_utils.is_sshable_image(self.image_ref)
-        self.ssh_user = self.image_utils.ssh_user(self.image_ref)
+        self.ssh_user = CONF.compute.ssh_user
         LOG.debug('Starting test for i:{image}, f:{flavor}. '
                   'Run ssh: {ssh}, user: {ssh_user}'.format(
                       image=self.image_ref, flavor=self.flavor_ref,
@@ -133,24 +131,23 @@ class ISS(manager.LisBase):
 
     def _verify_integrated_shutdown_services(self):
         status = self._get_iss_status()
-        self.assertTrue('true'==status, "Integrated shutdown services disabled.")
+        self.assertTrue('true' == status,
+                        "Integrated shutdown services disabled.")
         self._disable_iss()
         status = self._get_iss_status()
-        self.assertTrue('false'==status, 'Failed to disable iss.')
+        self.assertTrue('false' == status, 'Failed to disable iss.')
         self._enable_iss()
         status = self._get_iss_status()
-        self.assertTrue('true'==status, 'Failed to enable iss.')
+        self.assertTrue('true' == status, 'Failed to enable iss.')
 
     @test.attr(type=['smoke', 'core', 'iss'])
     @test.services('compute', 'network')
     def test_iss(self):
         self.spawn_vm()
-        self.servers_client.stop(self.server_id)
-        self.servers_client.wait_for_server_status(self.server_id, 'SHUTOFF')
-        self.servers_client.start(self.server_id)
-        self.servers_client.wait_for_server_status(self.server_id, 'ACTIVE')
-        self._initiate_linux_client(self.floating_ip['ip'], self.image_utils.ssh_user(
-            self.image_ref), self.keypair['private_key'])
+        self.stop_vm(self.server_id)
+        self.start_vm(self.server_id)
+        self._initiate_linux_client(self.floating_ip['ip'],
+                                    self.ssh_user, self.keypair['private_key'])
         try:
             self.linux_client.ping_host('127.0.0.1')
 

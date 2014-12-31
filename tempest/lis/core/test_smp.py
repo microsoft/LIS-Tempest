@@ -12,10 +12,8 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import os
 from tempest import config
 from tempest.openstack.common import log as logging
-from tempest.common.utils.windows.remote_client import WinRemoteClient
 from tempest.lis import manager
 from tempest.scenario import utils as test_utils
 from tempest import test
@@ -49,7 +47,7 @@ class ISS(manager.LisBase):
         self.instance_name = ""
         self.run_ssh = CONF.compute.run_ssh and \
             self.image_utils.is_sshable_image(self.image_ref)
-        self.ssh_user = self.image_utils.ssh_user(self.image_ref)
+        self.ssh_user = CONF.compute.ssh_user
         LOG.debug('Starting test for i:{image}, f:{flavor}. '
                   'Run ssh: {ssh}, user: {ssh_user}'.format(
                       image=self.image_ref, flavor=self.flavor_ref,
@@ -92,27 +90,25 @@ class ISS(manager.LisBase):
 
     def _test_shutdown_multi_cpu(self, max_cpu):
         for _ in range(2, max_cpu):
-            self.servers_client.stop(self.server_id)
-            self.servers_client.wait_for_server_status(self.server_id, 'SHUTOFF')
+            self.stop_vm(self.server_id)
             self.change_cpu(self.instance_name, _)
-            self.servers_client.start(self.server_id)
-            self.servers_client.wait_for_server_status(self.server_id, 'ACTIVE')
+            self.start_vm(self.server_id)
             vcpu_count = self.linux_client.get_number_of_vcpus()
-            self.assertTrue(vcpu_count == _ , "Expected %s , actual %s" % (_, vcpu_count))
+            self.assertTrue(
+                vcpu_count == _, "Expected %s , actual %s" % (_, vcpu_count))
 
     @test.attr(type=['smoke', 'core', 'smp'])
     @test.services('compute', 'network')
     def test_shutdown_smp(self):
         self.spawn_vm()
-        self._initiate_linux_client(self.floating_ip['ip'], self.image_utils.ssh_user(
-            self.image_ref), self.keypair['private_key'])
+        self._initiate_linux_client(self.floating_ip['ip'],
+                                    self.ssh_user, self.keypair['private_key'])
         self._test_shutdown_multi_cpu(5)
 
     @test.attr(type=['core', 'smp'])
     @test.services('compute', 'network')
     def test_shutdown_multi_cpu(self):
         self.spawn_vm()
-        self._initiate_linux_client(self.floating_ip['ip'], self.image_utils.ssh_user(
-            self.image_ref), self.keypair['private_key'])
+        self._initiate_linux_client(self.floating_ip['ip'],
+                                    self.ssh_user, self.keypair['private_key'])
         self._test_shutdown_multi_cpu(5)
-

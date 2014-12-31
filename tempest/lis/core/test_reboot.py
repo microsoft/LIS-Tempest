@@ -12,14 +12,12 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import pdb
-import os
 from tempest import config
 from tempest.openstack.common import log as logging
 from tempest.common.utils import data_utils
-from tempest.common.utils.windows.remote_client import WinRemoteClient
 from tempest.lis import manager
 from tempest.scenario import utils as test_utils
+from tempest import exceptions
 from tempest import test
 
 CONF = config.CONF
@@ -51,7 +49,7 @@ class Reboot(manager.LisBase):
         self.instance_name = ""
         self.run_ssh = CONF.compute.run_ssh and \
             self.image_utils.is_sshable_image(self.image_ref)
-        self.ssh_user = self.image_utils.ssh_user(self.image_ref)
+        self.ssh_user = CONF.compute.ssh_user
         LOG.debug('Starting test for i:{image}, f:{flavor}. '
                   'Run ssh: {ssh}, user: {ssh_user}'.format(
                       image=self.image_ref, flavor=self.flavor_ref,
@@ -97,7 +95,8 @@ class Reboot(manager.LisBase):
         self.assertEqual(_.status, 200)
         name = data_utils.rand_name('flavor')
         f_id = data_utils.rand_int_id(start=1000)
-        _, new_f = self.flavor_client.create_flavor(name=name, ram=new_ram, vcpus=int(c_f['vcpus']), disk=int(c_f['disk']), flavor_id=f_id)
+        _, new_f = self.flavor_client.create_flavor(name=name, ram=new_ram, vcpus=int(
+            c_f['vcpus']), disk=int(c_f['disk']), flavor_id=f_id)
         self.assertEqual(_.status, 200)
         self.addCleanup(self.flavor_client.delete_flavor, new_f['id'])
         return new_f['id']
@@ -108,18 +107,16 @@ class Reboot(manager.LisBase):
             new_flavor = self.create_flavor(memory)
             self.servers_client.resize(self.server_id, new_flavor)
             self.servers_client.wait_for_server_status(self.server_id,
-                                                   'VERIFY_RESIZE')
+                                                       'VERIFY_RESIZE')
             self.servers_client.confirm_resize(self.server_id)
             self.servers_client.reboot(self.server_id, 'SOFT')
             self._wait_for_server_status('ACTIVE')
 
     def _test_reboot(self, mem_settings):
         for memory in mem_settings:
-            self.servers_client.stop(self.server_id)
-            self.servers_client.wait_for_server_status(self.server_id, 'SHUTOFF')
+            self.stop_vm(self.server_id)
             self.set_ram_settings(self.instance_name, memory)
-            self.servers_client.start(self.server_id)
-            self.servers_client.wait_for_server_status(self.server_id, 'ACTIVE')
+            self.start_vm(self.server_id)
             try:
                 self.linux_client.ping_host('127.0.0.1')
 
@@ -131,8 +128,8 @@ class Reboot(manager.LisBase):
     @test.services('compute', 'network')
     def test_reboot_various_mem(self):
         self.spawn_vm()
-        self._initiate_linux_client(self.floating_ip['ip'], self.image_utils.ssh_user(
-            self.image_ref), self.keypair['private_key'])
+        self._initiate_linux_client(self.floating_ip['ip'],
+                                    self.ssh_user, self.keypair['private_key'])
         """
         Get back to this approach once resize is fixed
         mem_settings = [2048, 3584, 4608, 6144]
