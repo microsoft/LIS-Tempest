@@ -534,6 +534,16 @@ class Storage(StorageBase):
         self.check_floppy()
         self.servers_client.delete_server(self.instance['id'])
 
+    @test.attr(type=['smoke', 'core_storage'])
+    @test.services('compute', 'network')
+    def test_export_import(self):
+        self.spawn_vm()
+        self.servers_client.wait_for_server_status(self.server_id, 'ACTIVE')
+        self._initiate_linux_client(self.floating_ip['ip'], self.image_utils.ssh_user(
+            self.image_ref), self.keypair['private_key'])
+        self.export_import(self.instance_name)
+        self.servers_client.delete_server(self.instance['id'])
+
 class TestVHD(StorageBase):
 
     def setUp(self):

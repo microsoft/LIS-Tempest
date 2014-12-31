@@ -2681,6 +2681,19 @@ class LisBase(ScenarioTest):
         self.assertTrue(e_code == 0, assert_msg)
         return int(s_out)
 
+    def export_import(self, instance_name):
+        script_location = "%s%s" % (self.script_folder,
+                                    'setupscripts\\export-import.ps1')
+        s_out, s_err, e_code = self.win_client.run_powershell_cmd(
+                                script_location,
+                                hvServer=self.host_name,
+                                vmName=instance_name)
+
+        LOG.info('Export import result: %s', s_out)
+        assert_msg = '%s\n%s\n%s' % ('Failed to export import VM.',
+                                     str(s_out), str(s_err))
+        self.assertTrue(e_code == 0, assert_msg)
+
     def change_cpu(self, instance_name, new_cpu_count):
         """Change the vcpu of a vm"""
 
