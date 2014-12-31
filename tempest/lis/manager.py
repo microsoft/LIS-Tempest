@@ -2649,6 +2649,23 @@ class LisBase(ScenarioTest):
                                      str(s_out), str(s_err))
         self.assertTrue(e_code == 0, assert_msg)
 
+    def add_floppy_disk(self, instance_name):
+
+        script_location = "%s%s" % (self.script_folder,
+                                    'setupscripts\\add-floppy-disk.ps1')
+        s_out, s_err, e_code = self.win_client.run_powershell_cmd(
+                                script_location,
+                                hvServer=self.host_name,
+                                vmName=instance_name)
+
+        LOG.info('Add floppy disk result: %s', s_out)
+        assert_msg = '%s\n%s\n%s' % ('Failed to add floppy disk.',
+                                     str(s_out), str(s_err))
+        self.assertTrue(e_code == 0, assert_msg)
+
+        floppy_name = self.instance_name + '.vfd'
+        self.addCleanup(self.remove_disk, self.instance_name, floppy_name)
+
     def get_parent_disk_size(self, disk_name):
 
         script_location = "%s%s" % (self.script_folder,
@@ -2738,26 +2755,15 @@ class LisBase(ScenarioTest):
         self.assertTrue(s_out.lower() != 'lost communication', assert_msg)
 
     def format_disk(self, expected_disk_count, filesystem):
-        try:
-            script_name = 'STOR_Lis_Disk.sh'
-            script_path = '/core/scripts/' + script_name
-            destination = '/root/'
-            my_path = os.path.abspath(
-                os.path.normpath(os.path.dirname(__file__)))
-            full_script_path = my_path + script_path
-            cmd_params = [expected_disk_count, filesystem]
-            self.linux_client.execute_script(
-                script_name, cmd_params, full_script_path, destination)
-
-        except exceptions.SSHExecCommandFailed as exc:
-            LOG.exception(exc)
-            self._log_console_output()
-            raise exc
-
-        except Exception as exc:
-            LOG.exception(exc)
-            self._log_console_output()
-            raise exc
+        script_name = 'STOR_Lis_Disk.sh'
+        script_path = '/core/scripts/' + script_name
+        destination = '/root/'
+        my_path = os.path.abspath(
+            os.path.normpath(os.path.dirname(__file__)))
+        full_script_path = my_path + script_path
+        cmd_params = [expected_disk_count, filesystem]
+        self.linux_client.execute_script(
+            script_name, cmd_params, full_script_path, destination)
 
     def count_disks(self):
         try:
@@ -2766,54 +2772,42 @@ class LisBase(ScenarioTest):
 
         except exceptions.SSHExecCommandFailed as exc:
             LOG.exception(exc)
-            self._log_console_output()
             raise exc
 
         except Exception as exc:
             LOG.exception(exc)
-            self._log_console_output()
             raise ex
 
     def increase_disk_size(self):
-        try:
-            script_name = 'STOR_diff_disk.sh'
-            script_path = '/core/scripts/' + script_name
-            destination = '/root/'
-            my_path = os.path.abspath(
-                os.path.normpath(os.path.dirname(__file__)))
-            full_script_path = my_path + script_path
-            cmd_params = []
-            self.linux_client.execute_script(
-                script_name, cmd_params, full_script_path, destination)
-
-        except exceptions.SSHExecCommandFailed as exc:
-            LOG.exception(exc)
-            self._log_console_output()
-            raise exc
-
-        except Exception as exc:
-            LOG.exception(exc)
-            self._log_console_output()
-            raise exc
+        script_name = 'STOR_diff_disk.sh'
+        script_path = '/core/scripts/' + script_name
+        destination = '/root/'
+        my_path = os.path.abspath(
+            os.path.normpath(os.path.dirname(__file__)))
+        full_script_path = my_path + script_path
+        cmd_params = []
+        self.linux_client.execute_script(
+            script_name, cmd_params, full_script_path, destination)
 
     def check_iso(self):
-        try:
-            script_name = 'LIS_CD.sh'
-            script_path = '/core/scripts/' + script_name
-            destination = '/root/'
-            my_path = os.path.abspath(
-                os.path.normpath(os.path.dirname(__file__)))
-            full_script_path = my_path + script_path
-            cmd_params = []
-            self.linux_client.execute_script(
-                script_name, cmd_params, full_script_path, destination)
+        script_name = 'LIS_CD.sh'
+        script_path = '/core/scripts/' + script_name
+        destination = '/root/'
+        my_path = os.path.abspath(
+            os.path.normpath(os.path.dirname(__file__)))
+        full_script_path = my_path + script_path
+        cmd_params = []
+        self.linux_client.execute_script(
+            script_name, cmd_params, full_script_path, destination)
 
-        except exceptions.SSHExecCommandFailed as exc:
-            LOG.exception(exc)
-            self._log_console_output()
-            raise exc
 
-        except Exception as exc:
-            LOG.exception(exc)
-            self._log_console_output()
-            raise exc
+    def check_floppy(self):
+        script_name = 'LIS_Floppy_Disk.sh'
+        script_path = '/core/scripts/' + script_name
+        destination = '/root/'
+        my_path = os.path.abspath(
+            os.path.normpath(os.path.dirname(__file__)))
+        full_script_path = my_path + script_path
+        cmd_params = []
+        self.linux_client.execute_script(
+            script_name, cmd_params, full_script_path, destination)

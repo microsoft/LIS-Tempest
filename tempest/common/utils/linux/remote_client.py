@@ -20,9 +20,11 @@ import six
 from tempest.common import ssh
 from tempest import config
 from tempest import exceptions
+from tempest.openstack.common import log
 
 CONF = config.CONF
 
+LOG = log.getLogger(__name__)
 
 class RemoteClient():
 
@@ -170,9 +172,18 @@ class RemoteClient():
         return self.exec_command(cmd)
 
     def execute_script(self, cmd, cmd_params, source, destination):
-        self.copy_over(source, destination)
-        self.exec_command(
-            'cd ' + destination + '; dos2unix ' + cmd)
-        self.exec_command('chmod +x ' + cmd)
-        cmd_args = ' '.join(str(x) for x in cmd_params)
-        self.exec_command('./' + cmd + ' ' + cmd_args)
+        try:
+            self.copy_over(source, destination)
+            self.exec_command(
+                'cd ' + destination + '; dos2unix ' + cmd)
+            self.exec_command('chmod +x ' + cmd)
+            cmd_args = ' '.join(str(x) for x in cmd_params)
+            self.exec_command('./' + cmd + ' ' + cmd_args)
+
+        except exceptions.SSHExecCommandFailed as exc:
+            LOG.exception(exc)
+            raise exc
+
+        except Exception as exc:
+            LOG.exception(exc)
+            raise exc
