@@ -510,6 +510,13 @@ class Storage(StorageBase):
     def test_take_revert_snapshot_scsi(self):
         self._test_take_revert_snapshot()
 
+    def test_storage_iso(self):
+        self.spawn_vm()
+        self.servers_client.wait_for_server_status(self.server_id, 'ACTIVE')
+        self._initiate_linux_client(self.floating_ip['ip'], self.image_utils.ssh_user(
+            self.image_ref), self.keypair['private_key'])
+        self.check_iso()
+        self.servers_client.delete_server(self.instance['id'])
 
 class TestVHD(StorageBase):
 
