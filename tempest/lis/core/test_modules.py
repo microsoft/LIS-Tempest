@@ -13,10 +13,8 @@
 #    under the License.
 
 import os
-from time import sleep
 from tempest import config
 from tempest.openstack.common import log as logging
-from tempest.common.utils.windows.remote_client import WinRemoteClient
 from tempest.lis import manager
 from tempest.scenario import utils as test_utils
 from tempest import test
@@ -51,7 +49,7 @@ class LisModules(manager.LisBase):
         self.instance_name = ""
         self.run_ssh = CONF.compute.run_ssh and \
             self.image_utils.is_sshable_image(self.image_ref)
-        self.ssh_user = self.image_utils.ssh_user(self.image_ref)
+        self.ssh_user = CONF.compute.ssh_user
         LOG.debug('Starting test for i:{image}, f:{flavor}. '
                   'Run ssh: {ssh}, user: {ssh_user}'.format(
                       image=self.image_ref, flavor=self.flavor_ref,
@@ -151,15 +149,15 @@ class LisModules(manager.LisBase):
     @test.services('compute', 'network')
     def test_lis_modules_presence(self):
         self.spawn_vm()
-        self._initiate_linux_client(self.floating_ip['ip'], self.image_utils.ssh_user(
-            self.image_ref), self.keypair['private_key'])
+        self._initiate_linux_client(self.floating_ip['ip'],
+                                    self.ssh_user, self.keypair['private_key'])
         self.check_lis_modules()
 
     @test.attr(type=['core', 'lis_modules'])
     @test.services('compute', 'network')
     def test_lis_reload_modules(self):
         self.spawn_vm()
-        self._initiate_linux_client(self.floating_ip['ip'], self.image_utils.ssh_user(
-            self.image_ref), self.keypair['private_key'])
+        self._initiate_linux_client(self.floating_ip['ip'],
+                                    self.ssh_user, self.keypair['private_key'])
         self.reload_modules()
         self.servers_client.delete_server(self.instance['id'])

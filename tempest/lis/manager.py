@@ -2478,23 +2478,32 @@ class LisBase(ScenarioTest):
             self._log_console_output()
             raise exc
 
-    def add_disk(self, instance_name, disk_type, position, vhd_type, sec_size, size='1GB'):
+    def start_vm(self, vm_id):
+        self.servers_client.start(vm_id)
+        self.servers_client.wait_for_server_status(vm_id, 'ACTIVE')
+
+    def stop_vm(self, vm_id):
+        self.servers_client.stop(vm_id)
+        self.servers_client.wait_for_server_status(vm_id, 'SHUTOFF')
+
+    def add_disk(self, instance_name, disk_type,
+                 position, vhd_type, sec_size, size='1GB'):
         """Attach Disk to VM"""
 
         ctrl_type, ctrl_id, ctrl_loc = position
         script_location = "%s%s" % (self.script_folder,
                                     'setupscripts\\attach-disk.ps1')
         s_out, s_err, e_code = self.win_client.run_powershell_cmd(
-                                script_location,
-                                vmName=instance_name,
-                                hvServer=self.host_name,
-                                diskType=disk_type,
-                                controllerType=ctrl_type,
-                                controllerID=ctrl_id,
-                                Lun=ctrl_loc,
-                                vhdType=vhd_type,
-                                sectorSize=sec_size,
-                                diskSize=size)
+            script_location,
+            vmName=instance_name,
+            hvServer=self.host_name,
+            diskType=disk_type,
+            controllerType=ctrl_type,
+            controllerID=ctrl_id,
+            Lun=ctrl_loc,
+            vhdType=vhd_type,
+            sectorSize=sec_size,
+            diskSize=size)
 
         LOG.info('Add disk result: %s', s_out)
         assert_msg = '%s\n%s\n%s' % ('Failed to add disk.',
@@ -2502,24 +2511,24 @@ class LisBase(ScenarioTest):
         self.assertTrue(e_code == 0, assert_msg)
 
         disk_name = '-'.join([self.instance_name, ctrl_type,
-                            str(ctrl_id), str(ctrl_loc), vhd_type]) + '.*'
+                              str(ctrl_id), str(ctrl_loc), vhd_type]) + '.*'
         self.addCleanup(self.remove_disk, self.instance_name, disk_name)
         self.disks.append(disk_name)
 
     def add_pass_disk(self, instance_name, position):
         """Create a passthrough disk and attach to VM"""
         ctrl_type, ctrl_id, ctrl_loc = position
-        passthroughVhd = 'PassThrough'
+        passVhd = 'PassThrough'
         script_location = "%s%s" % (self.script_folder,
                                     'setupscripts\\attach-disk-pass.ps1')
         s_out, s_err, e_code = self.win_client.run_powershell_cmd(
-                                script_location,
-                                vmName=instance_name,
-                                hvServer=self.host_name,
-                                controllerType=ctrl_type,
-                                controllerID=ctrl_id,
-                                Lun=ctrl_loc,
-                                vhdType=passthroughVhd)
+            script_location,
+            vmName=instance_name,
+            hvServer=self.host_name,
+            controllerType=ctrl_type,
+            controllerID=ctrl_id,
+            Lun=ctrl_loc,
+            vhdType=passVhd)
 
         LOG.info('Add disk result: %s', s_out)
         assert_msg = '%s\n%s\n%s' % ('Failed to add disk.',
@@ -2527,33 +2536,7 @@ class LisBase(ScenarioTest):
         self.assertTrue(e_code == 0, assert_msg)
 
         disk_name = '-'.join([self.instance_name, ctrl_type,
-                            str(ctrl_id), str(ctrl_loc), passthroughVhd]) + '.*'
-        self.addCleanup(self.remove_disk, self.instance_name, disk_name)
-        self.disks.append(disk_name)
-
-
-    def add_pass_disk(self, instance_name, position):
-        """Create a passthrough disk and attach to VM"""
-        ctrl_type, ctrl_id, ctrl_loc = position
-        passthroughVhd = 'PassThrough'
-        script_location = "%s%s" % (self.script_folder,
-                                    'setupscripts\\attach-disk-pass.ps1')
-        s_out, s_err, e_code = self.win_client.run_powershell_cmd(
-                                script_location,
-                                vmName=instance_name,
-                                hvServer=self.host_name,
-                                controllerType=ctrl_type,
-                                controllerID=ctrl_id,
-                                Lun=ctrl_loc,
-                                vhdType=passthroughVhd)
-
-        LOG.info('Add disk result: %s', s_out)
-        assert_msg = '%s\n%s\n%s' % ('Failed to add disk.',
-                                     str(s_out), str(s_err))
-        self.assertTrue(e_code == 0, assert_msg)
-
-        disk_name = '-'.join([self.instance_name, ctrl_type,
-                            str(ctrl_id), str(ctrl_loc), passthroughVhd]) + '.*'
+                              str(ctrl_id), str(ctrl_loc), passVhd]) + '.*'
         self.addCleanup(self.remove_disk, self.instance_name, disk_name)
         self.disks.append(disk_name)
 
@@ -2564,13 +2547,13 @@ class LisBase(ScenarioTest):
         script_location = "%s%s" % (self.script_folder,
                                     'setupscripts\\add-diff-disk.ps1')
         s_out, s_err, e_code = self.win_client.run_powershell_cmd(
-                                script_location,
-                                vmName=instance_name,
-                                hvServer=self.host_name,
-                                controllerType=ctrl_type,
-                                controllerId=ctrl_id,
-                                Lun=ctrl_loc,
-                                parentType=vhd_type)
+            script_location,
+            vmName=instance_name,
+            hvServer=self.host_name,
+            controllerType=ctrl_type,
+            controllerId=ctrl_id,
+            Lun=ctrl_loc,
+            parentType=vhd_type)
 
         LOG.info('Add diff disk result: %s', s_out)
         assert_msg = '%s\n%s\n%s' % ('Failed to add diff disk.',
@@ -2578,7 +2561,7 @@ class LisBase(ScenarioTest):
         self.assertTrue(e_code == 0, assert_msg)
 
         disk_name = '-'.join([self.instance_name, ctrl_type,
-                            str(ctrl_id), str(ctrl_loc), 'Diff.']) + vhd_type
+                              str(ctrl_id), str(ctrl_loc), 'Diff.']) + vhd_type
         self.addCleanup(self.remove_disk, self.instance_name, disk_name)
         self.disks.append(disk_name)
 
@@ -2608,10 +2591,10 @@ class LisBase(ScenarioTest):
         script_location = "%s%s" % (self.script_folder,
                                     'setupscripts\\remove-disk.ps1')
         s_out, s_err, e_code = self.win_client.run_powershell_cmd(
-                                script_location,
-                                vmName=instance_name,
-                                hvServer=self.host_name,
-                                diskName=disk_name)
+            script_location,
+            vmName=instance_name,
+            hvServer=self.host_name,
+            diskName=disk_name)
 
         LOG.info('Remove disk result: %s', s_out)
         assert_msg = '%s\n%s\n%s' % ('Failed to remove disk.',
@@ -2624,10 +2607,10 @@ class LisBase(ScenarioTest):
         script_location = "%s%s" % (self.script_folder,
                                     'setupscripts\\detach-disk.ps1')
         s_out, s_err, e_code = self.win_client.run_powershell_cmd(
-                                script_location,
-                                vmName=instance_name,
-                                hvServer=self.host_name,
-                                diskName=disk_name)
+            script_location,
+            vmName=instance_name,
+            hvServer=self.host_name,
+            diskName=disk_name)
 
         LOG.info('Detach disk result: %s', s_out)
         assert_msg = '%s\n%s\n%s' % ('Failed to detach disk.',
@@ -2640,9 +2623,9 @@ class LisBase(ScenarioTest):
         script_location = "%s%s" % (self.script_folder,
                                     'setupscripts\\detach-pass-disk.ps1')
         s_out, s_err, e_code = self.win_client.run_powershell_cmd(
-                                script_location,
-                                hvServer=self.host_name,
-                                diskName=disk_name)
+            script_location,
+            hvServer=self.host_name,
+            diskName=disk_name)
 
         LOG.info('Detach disk result: %s', s_out)
         assert_msg = '%s\n%s\n%s' % ('Failed to detach disk.',
@@ -2654,9 +2637,9 @@ class LisBase(ScenarioTest):
         script_location = "%s%s" % (self.script_folder,
                                     'setupscripts\\add-floppy-disk.ps1')
         s_out, s_err, e_code = self.win_client.run_powershell_cmd(
-                                script_location,
-                                hvServer=self.host_name,
-                                vmName=instance_name)
+            script_location,
+            hvServer=self.host_name,
+            vmName=instance_name)
 
         LOG.info('Add floppy disk result: %s', s_out)
         assert_msg = '%s\n%s\n%s' % ('Failed to add floppy disk.',
@@ -2671,9 +2654,9 @@ class LisBase(ScenarioTest):
         script_location = "%s%s" % (self.script_folder,
                                     'setupscripts\\get-parent-disk-size.ps1')
         s_out, s_err, e_code = self.win_client.run_powershell_cmd(
-                                script_location,
-                                hvServer=self.host_name,
-                                diskName=disk_name)
+            script_location,
+            hvServer=self.host_name,
+            diskName=disk_name)
 
         LOG.info('Get parent disk size result: %s', s_out)
         assert_msg = '%s\n%s\n%s' % ('Failed to get parent disk size.',
@@ -2685,9 +2668,9 @@ class LisBase(ScenarioTest):
         script_location = "%s%s" % (self.script_folder,
                                     'setupscripts\\export-import.ps1')
         s_out, s_err, e_code = self.win_client.run_powershell_cmd(
-                                script_location,
-                                hvServer=self.host_name,
-                                vmName=instance_name)
+            script_location,
+            hvServer=self.host_name,
+            vmName=instance_name)
 
         LOG.info('Export import result: %s', s_out)
         assert_msg = '%s\n%s\n%s' % ('Failed to export import VM.',
@@ -2698,10 +2681,10 @@ class LisBase(ScenarioTest):
         """Change the vcpu of a vm"""
 
         s_out, s_err, e_code = self.win_client.run_powershell_cmd(
-                                'Set-VM',
-                                ComputerName=self.host_name,
-                                Name=instance_name,
-                                ProcessorCount=new_cpu_count)
+            'Set-VM',
+            ComputerName=self.host_name,
+            Name=instance_name,
+            ProcessorCount=new_cpu_count)
         LOG.info('Change vcpu result: %s', s_out)
         assert_msg = '%s\n%s\n%s' % ('Failed to change vcpu.',
                                      str(s_out), str(s_err))
@@ -2711,10 +2694,10 @@ class LisBase(ScenarioTest):
         """ Take a snapshot of a VM. """
 
         s_out, s_err, e_code = self.win_client.run_powershell_cmd(
-                                'Checkpoint-VM',
-                                ComputerName=self.host_name,
-                                Name=instance_name,
-                                SnapshotName=snapshot_name)
+            'Checkpoint-VM',
+            ComputerName=self.host_name,
+            Name=instance_name,
+            SnapshotName=snapshot_name)
         LOG.info('Take snapshot result: %s', s_out)
         assert_msg = '%s\n%s\n%s' % ('Failed to take snapshot.',
                                      str(s_out), str(s_err))
@@ -2724,11 +2707,11 @@ class LisBase(ScenarioTest):
         """ Revert specified VM to specified snapshot. """
 
         s_out, s_err, e_code = self.win_client.run_powershell_cmd(
-                                'Restore-VMSnapshot',
-                                ComputerName=self.host_name,
-                                VMName=instance_name,
-                                Name=snapshot_name,
-                                Confirm='$false')
+            'Restore-VMSnapshot',
+            ComputerName=self.host_name,
+            VMName=instance_name,
+            Name=snapshot_name,
+            Confirm='$false')
         LOG.info('Revert snapshot result: %s', s_out)
         assert_msg = '%s\n%s\n%s' % ('Failed to revert to snapshot.',
                                      str(s_out), str(s_err))
@@ -2738,7 +2721,7 @@ class LisBase(ScenarioTest):
 
         cmd = 'powershell -Command $(Get-VMIntegrationService \
                -ComputerName %s -VMName %s -Name Heartbeat).Enabled' % (
-                self.host_name, instance_name)
+            self.host_name, instance_name)
         s_out, s_err, e_code = self.win_client.run_wsman_cmd(cmd)
         LOG.info('Command std_out: %s', s_out)
         self.assertTrue(
@@ -2746,10 +2729,10 @@ class LisBase(ScenarioTest):
 
     def set_ram_settings(self, instance_name, new_memory):
         s_out, s_err, e_code = self.win_client.run_powershell_cmd(
-                                'Set-VMMemory',
-                                ComputerName=self.host_name,
-                                VMName=instance_name,
-                                StartupBytes =new_memory*1024*1024)
+            'Set-VMMemory',
+            ComputerName=self.host_name,
+            VMName=instance_name,
+            StartupBytes=new_memory * 1024 * 1024)
         LOG.info('Set new ram settings result: %s', s_out)
         assert_msg = '%s\n%s\n%s' % ('Failed to set new ram settings.',
                                      str(s_out), str(s_err))
@@ -2789,7 +2772,7 @@ class LisBase(ScenarioTest):
 
         except Exception as exc:
             LOG.exception(exc)
-            raise ex
+            raise exc
 
     def increase_disk_size(self):
         script_name = 'STOR_diff_disk.sh'
@@ -2812,7 +2795,6 @@ class LisBase(ScenarioTest):
         cmd_params = []
         self.linux_client.execute_script(
             script_name, cmd_params, full_script_path, destination)
-
 
     def check_floppy(self):
         script_name = 'LIS_Floppy_Disk.sh'

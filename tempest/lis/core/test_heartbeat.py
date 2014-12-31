@@ -12,11 +12,8 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import pdb
-import os
 from tempest import config
 from tempest.openstack.common import log as logging
-from tempest.common.utils.windows.remote_client import WinRemoteClient
 from tempest.lis import manager
 from tempest.scenario import utils as test_utils
 from tempest import test
