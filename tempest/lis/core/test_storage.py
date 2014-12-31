@@ -124,6 +124,25 @@ class StorageBase(manager.LisBase):
         self.format_disk(expected_disk_count, filesystem)
         self.servers_client.delete_server(self.instance['id'])
 
+    def _test_large_disk(self, pos, vhd_type, expected_disk_count, filesystem, size):
+        self.spawn_vm()
+        self.servers_client.stop(self.server_id)
+        self.servers_client.wait_for_server_status(self.server_id, 'SHUTOFF')
+        if isinstance(pos, list):
+            for position in pos:
+                self.add_disk(
+                    self.instance_name, self.disk_type, position, vhd_type, self.sector_size, size)
+        else:
+            self.add_disk(
+                self.instance_name, self.disk_type, pos, vhd_type, self.sector_size, size)
+        self.servers_client.start(self.server_id)
+        self.servers_client.wait_for_server_status(self.server_id, 'ACTIVE')
+
+        self._initiate_linux_client(self.floating_ip['ip'], self.image_utils.ssh_user(
+            self.image_ref), self.keypair['private_key'])
+        self.format_disk(expected_disk_count, filesystem)
+        self.servers_client.delete_server(self.instance['id'])
+
     def _test_add_passthrough(self, count, expected_disk_count, filesystem):
         self.spawn_vm()
         self.servers_client.stop(self.server_id)
@@ -475,6 +494,11 @@ class StorageBase(manager.LisBase):
         position = ('SCSI', 1, 1)
         self._test_diff_disk(position)
 
+    def _test_storage_dynamic_large_scsi(self, size):
+        position = ('SCSI', 1, 1)
+        file_system = 'ext4'
+        self._test_large_disk(position, 'Dynamic', 1, file_system, size)
+
 
 class Storage(StorageBase):
 
@@ -585,6 +609,12 @@ class TestVHD(StorageBase):
         self.file_system = 'btrfs'
         self._test_storage_dynamic_scsi()
 
+    @test.attr(type=['core_storage', 'vhd', 'dynamic', 'large'])
+    @test.services('compute', 'network')
+    def test_dynamic_large_scsi(self):
+        size = '20GB'
+        self._test_storage_dynamic_large_scsi(size)
+
     @test.attr(type=['smoke', 'core_storage', 'vhd', 'dynamic', 'hot', 'SCSI'])
     @test.services('compute', 'network')
     def test_storage_vhd_dynamic_hot_add_scsi(self):
@@ -692,6 +722,12 @@ class TestVHDx(StorageBase):
     @test.services('compute', 'network')
     def test_storage_vhdx_dynamic_hot_add_multi_scsi(self):
         self._test_storage_dynamic_hot_add_multi_scsi()
+
+    @test.attr(type=['core_storage', 'vhdx', 'dynamic', 'large'])
+    @test.services('compute', 'network')
+    def test_vhdx_dynamic_large_scsi(self):
+        size = '20GB'
+        self._test_storage_dynamic_large_scsi(size)
 
     @test.attr(type=['core_storage', 'vhdx', 'differencing', 'IDE'])
     @test.services('compute', 'network')
