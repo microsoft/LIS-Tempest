@@ -2795,3 +2795,25 @@ class LisBase(ScenarioTest):
             LOG.exception(exc)
             self._log_console_output()
             raise exc
+
+    def check_iso(self):
+        try:
+            script_name = 'LIS_CD.sh'
+            script_path = '/core/scripts/' + script_name
+            destination = '/root/'
+            my_path = os.path.abspath(
+                os.path.normpath(os.path.dirname(__file__)))
+            full_script_path = my_path + script_path
+            cmd_params = []
+            self.linux_client.execute_script(
+                script_name, cmd_params, full_script_path, destination)
+
+        except exceptions.SSHExecCommandFailed as exc:
+            LOG.exception(exc)
+            self._log_console_output()
+            raise exc
+
+        except Exception as exc:
+            LOG.exception(exc)
+            self._log_console_output()
+            raise exc
