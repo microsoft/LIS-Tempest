@@ -2478,7 +2478,7 @@ class LisBase(ScenarioTest):
             self._log_console_output()
             raise exc
 
-    def add_disk(self, instance_name, disk_type, position, vhd_type, sec_size):
+    def add_disk(self, instance_name, disk_type, position, vhd_type, sec_size, size='1GB'):
         """Attach Disk to VM"""
 
         ctrl_type, ctrl_id, ctrl_loc = position
@@ -2493,7 +2493,8 @@ class LisBase(ScenarioTest):
                                 controllerID=ctrl_id,
                                 Lun=ctrl_loc,
                                 vhdType=vhd_type,
-                                sectorSize=sec_size)
+                                sectorSize=sec_size,
+                                diskSize=size)
 
         LOG.info('Add disk result: %s', s_out)
         assert_msg = '%s\n%s\n%s' % ('Failed to add disk.',
