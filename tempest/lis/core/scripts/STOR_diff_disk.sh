@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Cloudbase Solutions Srl
+# Copyright 2015 Cloudbase Solutions Srl
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
 #    not use this file except in compliance with the License. You may obtain
@@ -14,15 +14,14 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-
 echoerr() { echo "$@" 1>&2; }
 
-mount /dev/sdb1 /mnt
+sudo mount /dev/sdb1 /mnt
 if [ "$?" = "0" ]; then
-        mkdir -p /mnt/ica
-        dd if=/dev/sda1 of=/mnt/ica/test.dat count=2048 > /dev/null 2>&1
+        sudo mkdir -p /mnt/ica
+        sudo dd if=/dev/sda1 of=/mnt/ica/test.dat count=2048 > /dev/null 2>&1
         if [ "$?" = "0" ]; then
-            umount /mnt
+            sudo umount /mnt
             if [ "$?" != "0" ]; then
                 exit 55
             fi

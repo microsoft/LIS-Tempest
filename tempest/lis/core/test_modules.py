@@ -94,7 +94,7 @@ class LisModules(manager.LisBase):
         try:
             script_name = 'LIS_verifyHyperVIC.sh'
             script_path = '/scripts/' + script_name
-            destination = '/root/'
+            destination = '/tmp/'
             my_path = os.path.abspath(
                 os.path.normpath(os.path.dirname(__file__)))
             full_script_path = my_path + script_path
@@ -117,7 +117,7 @@ class LisModules(manager.LisBase):
         try:
             script_name = 'CORE_StressReloadModules.sh'
             script_path = '/scripts/' + script_name
-            destination = '/root/'
+            destination = '/tmp/'
             my_path = os.path.abspath(
                 os.path.normpath(os.path.dirname(__file__)))
             full_script_path = my_path + script_path
@@ -152,6 +152,7 @@ class LisModules(manager.LisBase):
         self._initiate_linux_client(self.floating_ip['ip'],
                                     self.ssh_user, self.keypair['private_key'])
         self.check_lis_modules()
+        self.servers_client.delete_server(self.instance['id'])
 
     @test.attr(type=['core', 'lis_modules'])
     @test.services('compute', 'network')

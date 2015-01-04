@@ -13,6 +13,9 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import time
+import os
+
 from tempest import config
 from tempest.common import debug
 from tempest.common.utils.windows.remote_client import WinRemoteClient
@@ -20,7 +23,8 @@ from tempest.lis import manager
 from tempest.openstack.common import log as logging
 from tempest.scenario import utils as test_utils
 from tempest import test
-from time import time
+from tempest import exceptions
+
 CONF = config.CONF
 
 LOG = logging.getLogger(__name__)
@@ -28,22 +32,10 @@ LOG = logging.getLogger(__name__)
 load_tests = test_utils.load_tests_input_scenario_utils
 
 
-class TestLis(manager.ScenarioTest):
-
-    """
-    This smoke test case follows this basic set of operations:
-
-     * Create a keypair for use in launching an instance
-     * Create a security group to control network access in instance
-     * Add simple permissive rules to the security group
-     * Launch an instance
-     * Pause/unpause the instance
-     * Suspend/resume the instance
-     * Terminate the instance
-    """
+class TimeSync(manager.LisBase):
 
     def setUp(self):
-        super(TestLis, self).setUp()
+        super(TimeSync, self).setUp()
         # Setup image and flavor the test instance
         # Support both configured and injected values
         if not hasattr(self, 'image_ref'):
@@ -58,22 +50,15 @@ class TestLis(manager.ScenarioTest):
                     image=self.image_ref, flavor=self.flavor_ref
                 )
             )
+        self.host_name = ""
+        self.instance_name = ""
         self.run_ssh = CONF.compute.run_ssh and \
             self.image_utils.is_sshable_image(self.image_ref)
-        self.ssh_user = self.image_utils.ssh_user(self.image_ref)
+        self.ssh_user = CONF.compute.ssh_user
         LOG.debug('Starting test for i:{image}, f:{flavor}. '
                   'Run ssh: {ssh}, user: {ssh_user}'.format(
                       image=self.image_ref, flavor=self.flavor_ref,
                       ssh=self.run_ssh, ssh_user=self.ssh_user))
-
-        self.host_username = CONF.host_credentials.host_user_name
-        self.host_password = CONF.host_credentials.host_password
-
-    def _wait_for_server_status(self, status):
-        instance_id = self.instance['id']
-        # Raise on error defaults to True, which is consistent with the
-        # original function from scenario tests here
-        self.servers_client.wait_for_server_status(instance_id, status)
 
     def add_keypair(self):
         self.keypair = self.create_keypair()
@@ -88,23 +73,9 @@ class TestLis(manager.ScenarioTest):
         self.instance = self.create_server(image=self.image_ref,
                                            flavor=self.flavor_ref,
                                            create_kwargs=create_kwargs)
-
         self.instance_name = self.instance["OS-EXT-SRV-ATTR:instance_name"]
         self.host_name = self.instance["OS-EXT-SRV-ATTR:hypervisor_hostname"]
-        self._initiate_wsman(self.host_name)
-
-    def _initiate_wsman(self, host_name):
-        try:
-            self.wsmancmd = WinRemoteClient(
-                host_name, self.host_username, self.host_password)
-
-        except Exception as exc:
-            LOG.exception(exc)
-            raise exc
-
-    def nova_reboot(self):
-        self.servers_client.reboot(self.instance['id'], 'SOFT')
-        self._wait_for_server_status('ACTIVE')
+        self._initiate_win_client(self.host_name)
 
     def nova_floating_ip_create(self):
         _, self.floating_ip = self.floating_ips_client.create_floating_ip()
@@ -116,47 +87,74 @@ class TestLis(manager.ScenarioTest):
         self.floating_ips_client.associate_floating_ip_to_server(
             self.floating_ip['ip'], self.instance['id'])
 
-    def get_vm_time(self):
-        try:
-            linux_client = self.get_remote_client(
-                server_or_ip=self.floating_ip['ip'],
-                username=self.image_utils.ssh_user(self.image_ref),
-                private_key=self.keypair['private_key'])
-
-            unix_time = linux_client.get_unix_time()
-            LOG.debug('VM unix time %s ', unix_time)
-        except Exception:
-            LOG.exception('ssh to server failed')
-            self._log_console_output()
-            raise
-        return unix_time
-
-    def get_host_time(self):
-        cmd = 'powershell " [int]([DateTime]::UtcNow - $(new-object DateTime 1970,1,1,0,0,0,([DateTimeKind]::Utc))).TotalSeconds "'
-        LOG.debug('Sending command %s', cmd)
-        try:
-            std_out, std_err, exit_code = self.wsmancmd.run_wsman_cmd(cmd)
-
-        except Exception as exc:
-            LOG.exception(exc)
-            raise exc
-
-        LOG.debug('Command std_out: %s', std_out)
-        LOG.debug('Command std_err: %s', std_err)
-
-        return int(std_out)
-
-    @test.services('compute', 'network')
-    def test_time_sync_host(self):
+    def spawn_vm(self):
         self.add_keypair()
         self.security_group = self._create_security_group()
         self.boot_instance()
         self.nova_floating_ip_create()
         self.nova_floating_ip_add()
+        self.server_id = self.instance['id']
+
+    def check_ntp_time(self):
+        try:
+            script_name = 'CORE_timesync_NTP.sh'
+            script_path = '/scripts/' + script_name
+            destination = '/tmp/'
+            my_path = os.path.abspath(
+                os.path.normpath(os.path.dirname(__file__)))
+            full_script_path = my_path + script_path
+            cmd_params = []
+            self.linux_client.execute_script(
+                script_name, cmd_params, full_script_path, destination)
+
+        except exceptions.SSHExecCommandFailed as exc:
+
+            LOG.exception(exc)
+            self._log_console_output()
+            raise exc
+
+        except Exception as exc:
+            LOG.exception(exc)
+            self._log_console_output()
+            raise exc
+
+    @test.attr(type=['smoke', 'core', 'timesync'])
+    @test.services('compute', 'network')
+    def test_time_sync_ntp(self):
+        self.spawn_vm()
+        self._initiate_linux_client(self.floating_ip['ip'],
+                                    self.ssh_user, self.keypair['private_key'])
+        self.check_ntp_time()
+        self.servers_client.delete_server(self.instance['id'])
+
+    @test.attr(type=['smoke', 'core', 'timesync'])
+    @test.services('compute', 'network')
+    def test_time_sync_host(self):
+        self.spawn_vm()
+        self._initiate_linux_client(self.floating_ip['ip'],
+                                    self.ssh_user, self.keypair['private_key'])
         vm_time = self.get_vm_time()
-        t0 = time()
+        t0 = time.time()
         host_time = self.get_host_time()
-        t1 = time()
+        t1 = time.time()
+        exec_time = t1 - t0
+        LOG.debug('Duration of get_host_time %s', exec_time)
+        self.assertTrue(abs(vm_time - host_time) - exec_time < 7)
+        self.servers_client.delete_server(self.instance['id'])
+
+    @test.attr(type=['smoke', 'core', 'timesync'])
+    @test.services('compute', 'network')
+    def test_time_sync_saved_state(self):
+        self.spawn_vm()
+        self._initiate_linux_client(self.floating_ip['ip'],
+                                    self.ssh_user, self.keypair['private_key'])
+        self.save_vm(self.server_id)
+        time.sleep(20)
+        self.unsave_vm(self.server_id)
+        vm_time = self.get_vm_time()
+        t0 = time.time()
+        host_time = self.get_host_time()
+        t1 = time.time()
         exec_time = t1 - t0
         LOG.debug('Duration of get_host_time %s', exec_time)
         self.assertTrue(abs(vm_time - host_time) - exec_time < 7)

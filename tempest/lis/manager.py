@@ -2499,6 +2499,14 @@ class LisBase(ScenarioTest):
         self.servers_client.start(vm_id)
         self.servers_client.wait_for_server_status(vm_id, 'ACTIVE')
 
+    def save_vm(self, vm_id):
+        self.servers_client.suspend_server(vm_id)
+        self.servers_client.wait_for_server_status(vm_id, 'SUSPENDED')
+
+    def unsave_vm(self, vm_id):
+        self.servers_client.resume_server(vm_id)
+        self.servers_client.wait_for_server_status(vm_id, 'ACTIVE')
+
     def stop_vm(self, vm_id):
         self.servers_client.stop(vm_id)
         self.servers_client.wait_for_server_status(vm_id, 'SHUTOFF')
@@ -2823,3 +2831,25 @@ class LisBase(ScenarioTest):
         cmd_params = []
         self.linux_client.execute_script(
             script_name, cmd_params, full_script_path, destination)
+
+    def get_vm_time(self):
+        try:
+            unix_time = self.linux_client.get_unix_time()
+            LOG.debug('VM unix time %s ', unix_time)
+        except Exception:
+            LOG.exception('ssh to server failed')
+            self._log_console_output()
+            raise
+        return unix_time
+
+    def get_host_time(self):
+        s_out, s_err, e_code = self.win_client.run_wsman_cmd(
+            'powershell " [int]([DateTime]::UtcNow - '
+            '$(new-object DateTime 1970,1,1,0,0,0,([DateTimeKind]::Utc)))'
+            '.TotalSeconds"')
+        LOG.info('Status of get_host_time: %s', s_out)
+        assert_msg = '%s\n%s\n%s' % ('Failed to get host time.',
+                                     str(s_out), str(s_err))
+        self.assertTrue(e_code == 0, assert_msg)
+        self.assertTrue(s_out.lower() != 'lost communication', assert_msg)
+        return int(s_out)
