@@ -25,18 +25,18 @@ echoerr() { echo "$@" 1>&2; }
 
 VerifyModules()
 {
-echo "#### Status of Hyper-V Kernel Modules ####\n"
+echo "#### Status of Hyper-V Kernel Modules ####"
 HYPERV_MODULES=(hv_vmbus hv_netvsc hid_hyperv hv_utils hv_storvsc)
 PASS="0"
 for module in ${HYPERV_MODULES[@]}; do
-    module_alt=`echo $module|sed -n s/-/_/p`
-    load_status=$( lsmod | grep $module 2>&1)
+    module_alt=$(echo $module | sed -n s/-/_/p)
+    load_status=$(sudo lsmod | grep $module 2>&1)
         module_name=$module
     if [ "$module_alt" != "" ]; then
         # Some of our drivers, such as hid-hyperv.ko, is shown as
         # "hid_hyperv" from lsmod output. We have to replace all
         # "-" to "_".
-        load_status=$( lsmod | grep $module_alt 2>&1)
+        load_status=$(sudo lsmod | grep $module_alt 2>&1)
         module_name=$module_alt
     fi
 
@@ -62,7 +62,7 @@ fi
 
 VerifyModules
 
-modprobe -r hyperv_fb
+sudo modprobe -r hyperv_fb
 if [ $? -eq 0 ]; then
     msg="hyperv_fb could be disabled."
     echoerr "Error: ${msg}"
@@ -72,24 +72,24 @@ pass=0
 START=$(date +%s)
 while [ $pass -lt 500 ]
 do
-    modprobe -r hv_netvsc
-    modprobe hv_netvsc
-    modprobe -r hv_utils
-    modprobe hv_utils
+    sudo modprobe -r hv_netvsc
+    sudo modprobe hv_netvsc
+    sudo modprobe -r hv_utils
+    sudo modprobe hv_utils
     sleep 1
-    modprobe -r hid_hyperv
-    modprobe hid_hyperv
+    sudo modprobe -r hid_hyperv
+    sudo modprobe hid_hyperv
     pass=$((pass+1))
 done
 echo "Finished testing, bringing up eth0"
 touch ~/reload_finished
-ifdown eth0
+sudo ifdown eth0
 sleep 1
-ifup eth0
+sudo ifup eth0
 sleep 1
-ifdown eth0
+sudo ifdown eth0
 sleep 1
-ifup eth0
+sudo ifup eth0
 VerifyModules
 
 exit 0

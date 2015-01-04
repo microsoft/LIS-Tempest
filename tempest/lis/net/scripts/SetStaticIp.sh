@@ -4,6 +4,9 @@
 # $1 == static ip
 # $2 == netmask
 # $3 == interface
+
+sudo su
+
 LogMsg()
 {
 	echo $(date "+%a %b %d %T %Y") : "${1}" >> ~/$0.log
