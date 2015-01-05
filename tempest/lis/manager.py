@@ -36,6 +36,7 @@ from tempest.common import debug
 from tempest.common import isolated_creds
 from tempest.common.utils import data_utils
 from tempest.common.utils.linux import remote_client
+from tempest.common.utils.linux import factory as osutils_factory
 from tempest.common.utils.windows.remote_client import WinRemoteClient
 from tempest import config
 from tempest import exceptions
@@ -2468,10 +2469,10 @@ class LisBase(ScenarioTest):
 
     def _initiate_linux_client(self, server_or_ip, username, private_key):
         try:
-            self.linux_client = self.get_remote_client(
-                server_or_ip=server_or_ip,
+            self.linux_client = osutils_factory.get_os_utils(
+                server=server_or_ip,
                 username=username,
-                private_key=private_key)
+                pkey=private_key)
 
         except Exception as exc:
             LOG.exception(exc)
@@ -2777,7 +2778,7 @@ class LisBase(ScenarioTest):
     def increase_disk_size(self):
         script_name = 'STOR_diff_disk.sh'
         script_path = '/core/scripts/' + script_name
-        destination = '/root/'
+        destination = '/tmp/'
         my_path = os.path.abspath(
             os.path.normpath(os.path.dirname(__file__)))
         full_script_path = my_path + script_path
@@ -2788,7 +2789,7 @@ class LisBase(ScenarioTest):
     def check_iso(self):
         script_name = 'LIS_CD.sh'
         script_path = '/core/scripts/' + script_name
-        destination = '/root/'
+        destination = '/tmp/'
         my_path = os.path.abspath(
             os.path.normpath(os.path.dirname(__file__)))
         full_script_path = my_path + script_path
@@ -2799,7 +2800,7 @@ class LisBase(ScenarioTest):
     def check_floppy(self):
         script_name = 'LIS_Floppy_Disk.sh'
         script_path = '/core/scripts/' + script_name
-        destination = '/root/'
+        destination = '/tmp/'
         my_path = os.path.abspath(
             os.path.normpath(os.path.dirname(__file__)))
         full_script_path = my_path + script_path
