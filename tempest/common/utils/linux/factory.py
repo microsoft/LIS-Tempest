@@ -1,6 +1,4 @@
-# vim: tabstop=4 shiftwidth=4 softtabstop=4
-
-# Copyright 2012 Cloudbase Solutions Srl
+# Copyright 2015 Cloudbase Solutions Srl
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
 #    not use this file except in compliance with the License. You may obtain
@@ -13,6 +11,7 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
+
 import functools
 import re
 from tempest.common.utils import classloader
@@ -45,6 +44,11 @@ def _get_os_utils(distro):
 def get_os_utils(**kvargs):
     cl = classloader.ClassLoader()
     linux_client = remote_client.RemoteClientBase(**kvargs)
+    try:
+        linux_client.validate_authentication()
+    except exceptions.SSHTimeout:
+        LOG.exception('ssh connection to %s failed' % ip)
+        raise
     distro = linux_client.get_os_type()
     os_helper = _get_os_utils(distro)
-    cl.load_class(os_helper)(**kvargs)
+    return cl.load_class(os_helper)(**kvargs)

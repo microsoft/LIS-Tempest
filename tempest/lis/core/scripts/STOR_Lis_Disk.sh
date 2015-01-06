@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Cloudbase Solutions Srl
+# Copyright 2015 Cloudbase Solutions Srl
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
 #    not use this file except in compliance with the License. You may obtain
@@ -14,12 +14,11 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-
 expectedDiskCount=$1
 fileSystem=$2
 echoerr() { echo "$@" 1>&2; }
 sdCount=0
-for drive in $(find /sys/devices/ -name sd* | grep 'sd.$' | sed 's/.*\(...\)$/\1/')
+for drive in $(sudo find /sys/devices/ -name sd* | grep 'sd.$' | sed 's/.*\(...\)$/\1/')
 do
     sdCount=$((sdCount+1))
 done
@@ -31,27 +30,27 @@ then
 fi
 
 firstDrive=1
-for drive in $(find /sys/devices/ -name sd* | grep 'sd.$' | sed 's/.*\(...\)$/\1/')
+for drive in $(sudo find /sys/devices/ -name sd* | grep 'sd.$' | sed 's/.*\(...\)$/\1/')
 do
     if [ ${drive} = "sda" ];
     then
         continue
     fi
     driveName="/dev/${drive}"
-    (echo d;echo;echo w)|fdisk  $driveName
-    (echo n;echo p;echo 1;echo;echo;echo w)|fdisk  $driveName
+    (echo d;echo;echo w) | sudo fdisk  $driveName
+    (echo n;echo p;echo 1;echo;echo;echo w) | sudo fdisk  $driveName
     if [ "$?" = "0" ]; then
         sleep 5
-        mkfs.$fileSystem  ${driveName}1
+        sudo mkfs.$fileSystem  ${driveName}1
         if [ "$?" = "0" ]; then
-            mount ${driveName}1 /mnt
+            sudo mount ${driveName}1 /mnt
                     if [ "$?" = "0" ]; then
-                        mkdir /mnt/Example
-                        dd if=/dev/zero of=/mnt/Example/data bs=10M count=50
+                        sudo mkdir /mnt/Example
+                        sudo dd if=/dev/zero of=/mnt/Example/data bs=10M count=50
                         if [ "$?" = "0" ]; then
-                            ls /mnt/Example
+                            sudo ls /mnt/Example
                             df -h
-                            umount /mnt
+                            sudo umount /mnt
                             if [ "$?" != "0" ]; then
                                 exit 55
                             fi

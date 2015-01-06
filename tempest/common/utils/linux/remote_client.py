@@ -78,9 +78,11 @@ class RemoteClientBase():
         try:
             self.copy_over(source, destination)
             cmd_args = ' '.join(str(x) for x in cmd_params)
-            command = 'cd {dest}; chmod +x {cmd}; \
-            ./{cmd} {cmd_args}'.format(
-                dest=destination, cmd=cmd, cmd_args=cmd_args)
+            command = ('cd %(dest)s; chmod +x %(cmd)s; '
+                       './%(cmd)s %(cmd_args)s') % {
+                'dest': destination,
+                'cmd': cmd,
+                'cmd_args': cmd_args}
             return self.exec_command(command)
 
         except exceptions.SSHExecCommandFailed as exc:
@@ -214,3 +216,9 @@ class UbuntuUtils(RemoteClient):
 
     def get_os_type(self):
         return 'ubuntu'
+
+
+class Fedora7Utils(RemoteClient):
+
+    def get_os_type(self):
+        return 'fedora7'

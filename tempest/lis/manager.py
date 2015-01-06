@@ -2467,13 +2467,29 @@ class LisBase(ScenarioTest):
             LOG.exception(exc)
             raise exc
 
+    def get_remote_client(self, server_or_ip, username=None, private_key=None):
+        if isinstance(server_or_ip, six.string_types):
+            ip = server_or_ip
+        else:
+            network_name_for_ssh = CONF.compute.network_for_ssh
+            ip = server_or_ip.networks[network_name_for_ssh][0]
+        if username is None:
+            username = CONF.scenario.ssh_user
+        if private_key is None:
+            private_key = self.keypair['private_key']
+        linux_client = osutils_factory.get_os_utils(
+            server=ip,
+            username=username,
+            pkey=private_key)
+
+        return linux_client
+
     def _initiate_linux_client(self, server_or_ip, username, private_key):
         try:
-            self.linux_client = osutils_factory.get_os_utils(
-                server=server_or_ip,
+            self.linux_client = self.get_remote_client(
+                server_or_ip=server_or_ip,
                 username=username,
-                pkey=private_key)
-
+                private_key=private_key)
         except Exception as exc:
             LOG.exception(exc)
             self._log_console_output()
@@ -2754,7 +2770,7 @@ class LisBase(ScenarioTest):
     def format_disk(self, expected_disk_count, filesystem):
         script_name = 'STOR_Lis_Disk.sh'
         script_path = '/core/scripts/' + script_name
-        destination = '/root/'
+        destination = '/tmp/'
         my_path = os.path.abspath(
             os.path.normpath(os.path.dirname(__file__)))
         full_script_path = my_path + script_path
