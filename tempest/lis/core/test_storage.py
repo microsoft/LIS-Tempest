@@ -22,8 +22,6 @@ CONF = config.CONF
 
 LOG = logging.getLogger(__name__)
 
-load_tests = test_utils.load_tests_input_scenario_utils
-
 
 class StorageBase(manager.LisBase):
 
@@ -60,6 +58,7 @@ class StorageBase(manager.LisBase):
         self.file_system = 'ext3'
         self.sector_size = 512
         self.disks = []
+        self.disk_type = 'vhd'
         self.run_ssh = CONF.compute.run_ssh and \
             self.image_utils.is_sshable_image(self.image_ref)
         self.ssh_user = CONF.compute.ssh_user
@@ -84,7 +83,7 @@ class StorageBase(manager.LisBase):
                                            create_kwargs=create_kwargs)
         self.instance_name = self.instance["OS-EXT-SRV-ATTR:instance_name"]
         self.host_name = self.instance["OS-EXT-SRV-ATTR:hypervisor_hostname"]
-        self._initiate_win_client(self.host_name)
+        self._initiate_host_client(self.host_name)
 
     def nova_floating_ip_create(self):
         _, self.floating_ip = self.floating_ips_client.create_floating_ip()
@@ -185,7 +184,7 @@ class StorageBase(manager.LisBase):
                 self.detach_passthrough(disk)
         self.servers_client.delete_server(self.instance['id'])
 
-    def _test_hot_remove_passthrough(self, count, exc_dsk_cnt, filesystem):
+    def _test_hot_remove_passthrough(self, count, exc_dsk_cnt):
         self.spawn_vm()
         self.stop_vm(self.server_id)
         self.disks = []
@@ -199,7 +198,7 @@ class StorageBase(manager.LisBase):
             for disk in self.disks:
                 self.detach_passthrough(disk)
             disk_count = self.count_disks()
-            self.assertEqual(disk_count, 1)
+            self.assertEqual(disk_count, exc_dsk_cnt)
         except Exception as exc:
             LOG.exception(exc)
             for disk in self.disks:
@@ -229,7 +228,7 @@ class StorageBase(manager.LisBase):
         self.format_disk(exc_dsk_cnt, filesystem)
         self.servers_client.delete_server(self.instance['id'])
 
-    def _test_hot_remove(self, pos, vhd_type, exc_dsk_cnt, filesystem):
+    def _test_hot_remove(self, pos, vhd_type, exc_dsk_cnt):
         self.spawn_vm()
         self.stop_vm(self.server_id)
         if isinstance(pos, list):
@@ -409,7 +408,7 @@ class StorageBase(manager.LisBase):
 
     def _test_pass_hot_remove_multi_scsi(self):
         count = ['b', 'c']
-        self._test_hot_remove_passthrough(count, 2, self.file_system)
+        self._test_hot_remove_passthrough(count, 1)
 
     def _test_fixed_scsi(self):
         position = ('SCSI', 1, 1)
@@ -445,7 +444,7 @@ class StorageBase(manager.LisBase):
 
     def _test_dynamic_hot_remove_scsi(self):
         position = ('SCSI', 0, 1)
-        self._test_hot_remove(position, 'Dynamic', 1, self.file_system)
+        self._test_hot_remove(position, 'Dynamic', 1)
 
     def _test_dynamic_hot_swap_scsi(self):
         positions = [('SCSI', 0, 0), ('SCSI', 0, 1)]

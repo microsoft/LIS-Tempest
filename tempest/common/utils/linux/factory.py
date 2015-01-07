@@ -14,8 +14,10 @@
 
 import functools
 import re
+from tempest import exceptions
 from tempest.common.utils import classloader
 from tempest.common.utils.linux import remote_client
+from tempest.openstack.common import log
 
 
 DEFAULT_OS_HELPER = 'tempest.common.utils.linux.remote_client.RemoteClient'
@@ -33,6 +35,8 @@ FORMATS = (
 )
 del _compile
 
+LOG = log.getLogger(__name__)
+
 
 def _get_os_utils(distro):
     for pattern, os_helper_class in FORMATS:
@@ -47,7 +51,7 @@ def get_os_utils(**kvargs):
     try:
         linux_client.validate_authentication()
     except exceptions.SSHTimeout:
-        LOG.exception('ssh connection to %s failed' % ip)
+        LOG.exception('ssh connection failed')
         raise
     distro = linux_client.get_os_type()
     os_helper = _get_os_utils(distro)
