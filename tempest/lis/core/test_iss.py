@@ -90,42 +90,30 @@ class ISS(manager.LisBase):
     def _get_iss_status(self):
         """ Get the status of integrated shutdown services """
 
-        s_out, s_err, e_code = self.host_client.get_powershell_cmd_attribute(
+        s_out = self.host_client.get_powershell_cmd_attribute(
             'Get-VMIntegrationService', 'Enabled',
             ComputerName=self.host_name,
             VMName=self.instance_name,
             Name='Shutdown')
-        LOG.info('Status of iss: %s', s_out)
-        assert_msg = '%s\n%s\n%s' % ('Failed to get iss status.',
-                                     str(s_out), str(s_err))
-        self.assertTrue(e_code == 0, assert_msg)
         return s_out.lower().strip()
 
     def _disable_iss(self):
         """ Disable the integrated shutdown services """
 
-        s_out, s_err, e_code = self.host_client.run_powershell_cmd(
+        self.host_client.run_powershell_cmd(
             'Disable-VMIntegrationService',
             ComputerName=self.host_name,
             VMName=self.instance_name,
             Name='Shutdown')
-        LOG.info('Disable iss result: %s', s_out)
-        assert_msg = '%s\n%s\n%s' % ('Failed to disable iss.',
-                                     str(s_out), str(s_err))
-        self.assertTrue(e_code == 0, assert_msg)
 
     def _enable_iss(self):
         """ Enable the integrated shutdown services """
 
-        s_out, s_err, e_code = self.host_client.run_powershell_cmd(
+        self.host_client.run_powershell_cmd(
             'Enable-VMIntegrationService',
             ComputerName=self.host_name,
             VMName=self.instance_name,
             Name='Shutdown')
-        LOG.info('Enable iss result: %s', s_out)
-        assert_msg = '%s\n%s\n%s' % ('Failed to enable iss.',
-                                     str(s_out), str(s_err))
-        self.assertTrue(e_code == 0, assert_msg)
 
     def _verify_integrated_shutdown_services(self):
         status = self._get_iss_status()
