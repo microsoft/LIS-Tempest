@@ -13,17 +13,15 @@
 #    under the License.
 
 from tempest import config
+from tempest import exceptions
+from tempest import test
 from tempest.openstack.common import log as logging
 from tempest.lis import manager
 from tempest.scenario import utils as test_utils
-from tempest import exceptions
-from tempest import test
 
 CONF = config.CONF
 
 LOG = logging.getLogger(__name__)
-
-load_tests = test_utils.load_tests_input_scenario_utils
 
 
 class ISS(manager.LisBase):
@@ -69,7 +67,7 @@ class ISS(manager.LisBase):
                                            create_kwargs=create_kwargs)
         self.instance_name = self.instance["OS-EXT-SRV-ATTR:instance_name"]
         self.host_name = self.instance["OS-EXT-SRV-ATTR:hypervisor_hostname"]
-        self._initiate_win_client(self.host_name)
+        self._initiate_host_client(self.host_name)
 
     def nova_floating_ip_create(self):
         _, self.floating_ip = self.floating_ips_client.create_floating_ip()
@@ -92,7 +90,7 @@ class ISS(manager.LisBase):
     def _get_iss_status(self):
         """ Get the status of integrated shutdown services """
 
-        s_out, s_err, e_code = self.win_client.get_powershell_cmd_attribute(
+        s_out, s_err, e_code = self.host_client.get_powershell_cmd_attribute(
             'Get-VMIntegrationService', 'Enabled',
             ComputerName=self.host_name,
             VMName=self.instance_name,
@@ -106,7 +104,7 @@ class ISS(manager.LisBase):
     def _disable_iss(self):
         """ Disable the integrated shutdown services """
 
-        s_out, s_err, e_code = self.win_client.run_powershell_cmd(
+        s_out, s_err, e_code = self.host_client.run_powershell_cmd(
             'Disable-VMIntegrationService',
             ComputerName=self.host_name,
             VMName=self.instance_name,
@@ -119,7 +117,7 @@ class ISS(manager.LisBase):
     def _enable_iss(self):
         """ Enable the integrated shutdown services """
 
-        s_out, s_err, e_code = self.win_client.run_powershell_cmd(
+        s_out, s_err, e_code = self.host_client.run_powershell_cmd(
             'Enable-VMIntegrationService',
             ComputerName=self.host_name,
             VMName=self.instance_name,

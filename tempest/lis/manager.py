@@ -55,6 +55,7 @@ LOG_nova_client.addHandler(log.NullHandler())
 
 LOG_cinder_client = logging.getLogger('cinderclient.client')
 LOG_cinder_client.addHandler(log.NullHandler())
+SUCCESS_RETURN_CODE = 0
 
 
 class ScenarioTest(tempest.test.BaseTestCase):
@@ -2457,9 +2458,9 @@ class LisBase(ScenarioTest):
         self.host_password = CONF.host_credentials.host_password
         self.script_folder = CONF.host_credentials.host_setupscripts_folder
 
-    def _initiate_win_client(self, host_name):
+    def _initiate_host_client(self, host_name):
         try:
-            self.win_client = WinRemoteClient(
+            self.host_client = WinRemoteClient(
                 host_name, self.host_username, self.host_password)
             self.host_name = host_name
 
@@ -2518,7 +2519,7 @@ class LisBase(ScenarioTest):
         ctrl_type, ctrl_id, ctrl_loc = position
         script_location = "%s%s" % (self.script_folder,
                                     'setupscripts\\attach-disk.ps1')
-        s_out, s_err, e_code = self.win_client.run_powershell_cmd(
+        self.host_client.run_powershell_cmd(
             script_location,
             vmName=instance_name,
             hvServer=self.host_name,
@@ -2530,14 +2531,9 @@ class LisBase(ScenarioTest):
             sectorSize=sec_size,
             diskSize=size)
 
-        LOG.info('Add disk result: %s', s_out)
-        assert_msg = '%s\n%s\n%s' % ('Failed to add disk.',
-                                     str(s_out), str(s_err))
-        self.assertTrue(e_code == 0, assert_msg)
-
-        disk_name = '-'.join([self.instance_name, ctrl_type,
+        disk_name = '-'.join([instance_name, ctrl_type,
                               str(ctrl_id), str(ctrl_loc), vhd_type]) + '.*'
-        self.addCleanup(self.remove_disk, self.instance_name, disk_name)
+        self.addCleanup(self.remove_disk, instance_name, disk_name)
         self.disks.append(disk_name)
 
     def add_pass_disk(self, instance_name, position):
@@ -2546,7 +2542,7 @@ class LisBase(ScenarioTest):
         passVhd = 'PassThrough'
         script_location = "%s%s" % (self.script_folder,
                                     'setupscripts\\attach-disk-pass.ps1')
-        s_out, s_err, e_code = self.win_client.run_powershell_cmd(
+        self.host_client.run_powershell_cmd(
             script_location,
             vmName=instance_name,
             hvServer=self.host_name,
@@ -2555,14 +2551,9 @@ class LisBase(ScenarioTest):
             Lun=ctrl_loc,
             vhdType=passVhd)
 
-        LOG.info('Add disk result: %s', s_out)
-        assert_msg = '%s\n%s\n%s' % ('Failed to add disk.',
-                                     str(s_out), str(s_err))
-        self.assertTrue(e_code == 0, assert_msg)
-
-        disk_name = '-'.join([self.instance_name, ctrl_type,
+        disk_name = '-'.join([instance_name, ctrl_type,
                               str(ctrl_id), str(ctrl_loc), passVhd]) + '.*'
-        self.addCleanup(self.remove_disk, self.instance_name, disk_name)
+        self.addCleanup(self.remove_disk, instance_name, disk_name)
         self.disks.append(disk_name)
 
     def add_diff_disk(self, instance_name, position, vhd_type):
@@ -2571,7 +2562,7 @@ class LisBase(ScenarioTest):
         ctrl_type, ctrl_id, ctrl_loc = position
         script_location = "%s%s" % (self.script_folder,
                                     'setupscripts\\add-diff-disk.ps1')
-        s_out, s_err, e_code = self.win_client.run_powershell_cmd(
+        self.host_client.run_powershell_cmd(
             script_location,
             vmName=instance_name,
             hvServer=self.host_name,
@@ -2580,14 +2571,9 @@ class LisBase(ScenarioTest):
             Lun=ctrl_loc,
             parentType=vhd_type)
 
-        LOG.info('Add diff disk result: %s', s_out)
-        assert_msg = '%s\n%s\n%s' % ('Failed to add diff disk.',
-                                     str(s_out), str(s_err))
-        self.assertTrue(e_code == 0, assert_msg)
-
-        disk_name = '-'.join([self.instance_name, ctrl_type,
+        disk_name = '-'.join([instance_name, ctrl_type,
                               str(ctrl_id), str(ctrl_loc), 'Diff.']) + vhd_type
-        self.addCleanup(self.remove_disk, self.instance_name, disk_name)
+        self.addCleanup(self.remove_disk, instance_name, disk_name)
         self.disks.append(disk_name)
 
     def attach_passthrough(self, volume_id, device):
@@ -2615,164 +2601,117 @@ class LisBase(ScenarioTest):
 
         script_location = "%s%s" % (self.script_folder,
                                     'setupscripts\\remove-disk.ps1')
-        s_out, s_err, e_code = self.win_client.run_powershell_cmd(
+        self.host_client.run_powershell_cmd(
             script_location,
             vmName=instance_name,
             hvServer=self.host_name,
             diskName=disk_name)
-
-        LOG.info('Remove disk result: %s', s_out)
-        assert_msg = '%s\n%s\n%s' % ('Failed to remove disk.',
-                                     str(s_out), str(s_err))
-        self.assertTrue(e_code == 0, assert_msg)
 
     def detach_disk(self, instance_name, disk_name):
         """Detach a disk from a vm"""
 
         script_location = "%s%s" % (self.script_folder,
                                     'setupscripts\\detach-disk.ps1')
-        s_out, s_err, e_code = self.win_client.run_powershell_cmd(
+        self.host_client.run_powershell_cmd(
             script_location,
             vmName=instance_name,
             hvServer=self.host_name,
             diskName=disk_name)
-
-        LOG.info('Detach disk result: %s', s_out)
-        assert_msg = '%s\n%s\n%s' % ('Failed to detach disk.',
-                                     str(s_out), str(s_err))
-        self.assertTrue(e_code == 0, assert_msg)
 
     def make_passthrough_offline(self, disk_name):
         """Detach a PassThrough disk from a vm"""
 
         script_location = "%s%s" % (self.script_folder,
                                     'setupscripts\\detach-pass-disk.ps1')
-        s_out, s_err, e_code = self.win_client.run_powershell_cmd(
+        self.host_client.run_powershell_cmd(
             script_location,
             hvServer=self.host_name,
             diskName=disk_name)
-
-        LOG.info('Detach disk result: %s', s_out)
-        assert_msg = '%s\n%s\n%s' % ('Failed to detach disk.',
-                                     str(s_out), str(s_err))
-        self.assertTrue(e_code == 0, assert_msg)
 
     def add_floppy_disk(self, instance_name):
 
         script_location = "%s%s" % (self.script_folder,
                                     'setupscripts\\add-floppy-disk.ps1')
-        s_out, s_err, e_code = self.win_client.run_powershell_cmd(
+        self.host_client.run_powershell_cmd(
             script_location,
             hvServer=self.host_name,
             vmName=instance_name)
 
-        LOG.info('Add floppy disk result: %s', s_out)
-        assert_msg = '%s\n%s\n%s' % ('Failed to add floppy disk.',
-                                     str(s_out), str(s_err))
-        self.assertTrue(e_code == 0, assert_msg)
-
-        floppy_name = self.instance_name + '.vfd'
-        self.addCleanup(self.remove_disk, self.instance_name, floppy_name)
+        floppy_name = instance_name + '.vfd'
+        self.addCleanup(self.remove_disk, instance_name, floppy_name)
 
     def get_parent_disk_size(self, disk_name):
 
         script_location = "%s%s" % (self.script_folder,
                                     'setupscripts\\get-parent-disk-size.ps1')
-        s_out, s_err, e_code = self.win_client.run_powershell_cmd(
+        s_out = self.host_client.run_powershell_cmd(
             script_location,
             hvServer=self.host_name,
             diskName=disk_name)
 
-        LOG.info('Get parent disk size result: %s', s_out)
-        assert_msg = '%s\n%s\n%s' % ('Failed to get parent disk size.',
-                                     str(s_out), str(s_err))
-        self.assertTrue(e_code == 0, assert_msg)
         return int(s_out)
 
     def export_import(self, instance_name):
         script_location = "%s%s" % (self.script_folder,
                                     'setupscripts\\export-import.ps1')
-        s_out, s_err, e_code = self.win_client.run_powershell_cmd(
+        self.host_client.run_powershell_cmd(
             script_location,
             hvServer=self.host_name,
             vmName=instance_name)
 
-        LOG.info('Export import result: %s', s_out)
-        assert_msg = '%s\n%s\n%s' % ('Failed to export import VM.',
-                                     str(s_out), str(s_err))
-        self.assertTrue(e_code == 0, assert_msg)
-
     def change_cpu(self, instance_name, new_cpu_count):
         """Change the vcpu of a vm"""
 
-        s_out, s_err, e_code = self.win_client.run_powershell_cmd(
+        self.host_client.run_powershell_cmd(
             'Set-VM',
             ComputerName=self.host_name,
             Name=instance_name,
             ProcessorCount=new_cpu_count)
-        LOG.info('Change vcpu result: %s', s_out)
-        assert_msg = '%s\n%s\n%s' % ('Failed to change vcpu.',
-                                     str(s_out), str(s_err))
-        self.assertTrue(e_code == 0, assert_msg)
 
     def take_snapshot(self, instance_name, snapshot_name):
         """ Take a snapshot of a VM. """
 
-        s_out, s_err, e_code = self.win_client.run_powershell_cmd(
+        self.host_client.run_powershell_cmd(
             'Checkpoint-VM',
             ComputerName=self.host_name,
             Name=instance_name,
             SnapshotName=snapshot_name)
-        LOG.info('Take snapshot result: %s', s_out)
-        assert_msg = '%s\n%s\n%s' % ('Failed to take snapshot.',
-                                     str(s_out), str(s_err))
-        self.assertTrue(e_code == 0, assert_msg)
 
     def revert_snapshot(self, instance_name, snapshot_name):
         """ Revert specified VM to specified snapshot. """
 
-        s_out, s_err, e_code = self.win_client.run_powershell_cmd(
+        self.host_client.run_powershell_cmd(
             'Restore-VMSnapshot',
             ComputerName=self.host_name,
             VMName=instance_name,
             Name=snapshot_name,
             Confirm='$false')
-        LOG.info('Revert snapshot result: %s', s_out)
-        assert_msg = '%s\n%s\n%s' % ('Failed to revert to snapshot.',
-                                     str(s_out), str(s_err))
-        self.assertTrue(e_code == 0, assert_msg)
 
     def verify_heartbeat(self, instance_name):
+        s_out = self.host_client.get_powershell_cmd_attribute(
+            'Get-VMIntegrationService', 'Enabled',
+            ComputerName=self.host_name,
+            VMName=instance_name,
+            Name='Heartbeat')
 
-        cmd = 'powershell -Command $(Get-VMIntegrationService \
-               -ComputerName %s -VMName %s -Name Heartbeat).Enabled' % (
-            self.host_name, instance_name)
-        s_out, s_err, e_code = self.win_client.run_wsman_cmd(cmd)
-        LOG.info('Command std_out: %s', s_out)
-        self.assertTrue(
-            "True" in s_out, 'Heartbeat status %s ' % s_out)
+        assert_msg = 'Heartbeat disabled for VM %s' % instance_name
+        self.assertTrue(s_out.lower() != 'True', assert_msg)
 
     def set_ram_settings(self, instance_name, new_memory):
-        s_out, s_err, e_code = self.win_client.run_powershell_cmd(
+        self.host_client.run_powershell_cmd(
             'Set-VMMemory',
             ComputerName=self.host_name,
             VMName=instance_name,
             StartupBytes=new_memory * 1024 * 1024)
-        LOG.info('Set new ram settings result: %s', s_out)
-        assert_msg = '%s\n%s\n%s' % ('Failed to set new ram settings.',
-                                     str(s_out), str(s_err))
-        self.assertTrue(e_code == 0, assert_msg)
 
-    def check_heartbeat_status(self):
-        s_out, s_err, e_code = self.win_client.get_powershell_cmd_attribute(
+    def check_heartbeat_status(self, instance_name):
+        s_out = self.host_client.get_powershell_cmd_attribute(
             'Get-VMIntegrationService', 'PrimaryStatusDescription',
             ComputerName=self.host_name,
-            VMName=self.instance_name,
+            VMName=instance_name,
             Name='Heartbeat')
-        LOG.info('Status of Heartbeat: %s', s_out)
-        assert_msg = '%s\n%s\n%s' % ('Failed to get heartbeat status.',
-                                     str(s_out), str(s_err))
-        self.assertTrue(e_code == 0, assert_msg)
+
+        assert_msg = 'Heartbeat lost communication to VM'
         self.assertTrue(s_out.lower() != 'lost communication', assert_msg)
 
     def format_disk(self, expected_disk_count, filesystem):
@@ -2833,23 +2772,22 @@ class LisBase(ScenarioTest):
             script_name, cmd_params, full_script_path, destination)
 
     def get_vm_time(self):
-        try:
-            unix_time = self.linux_client.get_unix_time()
-            LOG.debug('VM unix time %s ', unix_time)
-        except Exception:
-            LOG.exception('ssh to server failed')
-            self._log_console_output()
-            raise
+        unix_time = self.linux_client.get_unix_time()
+        LOG.debug('VM unix time %s ', unix_time)
         return unix_time
 
     def get_host_time(self):
-        s_out, s_err, e_code = self.win_client.run_wsman_cmd(
-            'powershell " [int]([DateTime]::UtcNow - '
-            '$(new-object DateTime 1970,1,1,0,0,0,([DateTimeKind]::Utc)))'
-            '.TotalSeconds"')
-        LOG.info('Status of get_host_time: %s', s_out)
-        assert_msg = '%s\n%s\n%s' % ('Failed to get host time.',
-                                     str(s_out), str(s_err))
-        self.assertTrue(e_code == 0, assert_msg)
-        self.assertTrue(s_out.lower() != 'lost communication', assert_msg)
+        cmd = ('powershell " [int]([DateTime]::UtcNow - '
+               '$(new-object DateTime 1970,1,1,0,0,0,([DateTimeKind]::Utc)))'
+               '.TotalSeconds"')
+        s_out, s_err, r_code = self.host_client.run_wsman_cmd(cmd)
+        if r_code != SUCCESS_RETURN_CODE:
+            raise Exception("Command execution failed with code %(code)s:\n"
+                            "Command: %(cmd)s\n"
+                            "Output: %(output)s\n"
+                            "Error: %(error)s" % {
+                                'code': r_code,
+                                'cmd': cmd,
+                                'output': s_out,
+                                'error': s_err})
         return int(s_out)

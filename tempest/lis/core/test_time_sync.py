@@ -17,19 +17,17 @@ import time
 import os
 
 from tempest import config
+from tempest import exceptions
+from tempest import test
 from tempest.common import debug
 from tempest.common.utils.windows.remote_client import WinRemoteClient
 from tempest.lis import manager
 from tempest.openstack.common import log as logging
 from tempest.scenario import utils as test_utils
-from tempest import test
-from tempest import exceptions
 
 CONF = config.CONF
 
 LOG = logging.getLogger(__name__)
-
-load_tests = test_utils.load_tests_input_scenario_utils
 
 
 class TimeSync(manager.LisBase):
@@ -75,7 +73,7 @@ class TimeSync(manager.LisBase):
                                            create_kwargs=create_kwargs)
         self.instance_name = self.instance["OS-EXT-SRV-ATTR:instance_name"]
         self.host_name = self.instance["OS-EXT-SRV-ATTR:hypervisor_hostname"]
-        self._initiate_win_client(self.host_name)
+        self._initiate_host_client(self.host_name)
 
     def nova_floating_ip_create(self):
         _, self.floating_ip = self.floating_ips_client.create_floating_ip()
