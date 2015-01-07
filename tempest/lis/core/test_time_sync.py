@@ -147,7 +147,7 @@ class TimeSync(manager.LisBase):
         self._initiate_linux_client(self.floating_ip['ip'],
                                     self.ssh_user, self.keypair['private_key'])
         self.save_vm(self.server_id)
-        time.sleep(20)
+        time.sleep(600)  # keeping the vm 10 minutes in saved state
         self.unsave_vm(self.server_id)
         vm_time = self.get_vm_time()
         t0 = time.time()
