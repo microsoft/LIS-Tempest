@@ -12,9 +12,9 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import os
 import re
 import time
-
 import six
 
 from tempest.common import ssh
@@ -26,7 +26,8 @@ CONF = config.CONF
 
 LOG = log.getLogger(__name__)
 
-class RemoteClient():
+
+class RemoteClientBase():
 
     # NOTE(afazekas): It should always get an address instead of server
 
@@ -49,6 +50,17 @@ class RemoteClient():
                                      ssh_timeout, pkey=pkey,
                                      channel_timeout=ssh_channel_timeout)
 
+    def get_os_type(self):
+        script_name = 'get_os.sh'
+        destination = '/tmp/'
+        my_path = os.path.abspath(
+            os.path.normpath(os.path.dirname(__file__)))
+        full_script_path = my_path + '/' + script_name
+        cmd_params = []
+        distro = self.execute_script(
+            script_name, cmd_params, full_script_path, destination)
+        return distro.strip().lower()
+
     def exec_command(self, cmd):
         return self.ssh_client.exec_command(cmd)
 
@@ -61,6 +73,28 @@ class RemoteClient():
            This method raises an Exception when the validation fails.
         """
         self.ssh_client.test_connection_auth()
+
+    def execute_script(self, cmd, cmd_params, source, destination):
+        try:
+            self.copy_over(source, destination)
+            cmd_args = ' '.join(str(x) for x in cmd_params)
+            command = ('cd %(dest)s; chmod +x %(cmd)s; '
+                       './%(cmd)s %(cmd_args)s') % {
+                'dest': destination,
+                'cmd': cmd,
+                'cmd_args': cmd_args}
+            return self.exec_command(command)
+
+        except exceptions.SSHExecCommandFailed as exc:
+            LOG.exception(exc)
+            raise exc
+
+        except Exception as exc:
+            LOG.exception(exc)
+            raise exc
+
+
+class RemoteClient(RemoteClientBase):
 
     def hostname_equals_servername(self, expected_hostname):
         # Get host name using command "hostname"
@@ -140,12 +174,12 @@ class RemoteClient():
     def delete_file(self, file_name):
         cmd = 'rm -f %s' % file_name
         output = self.exec_command(cmd)
-        return (output)
+        return output
 
     def verify_deamon(self, deamon):
         cmd = 'ps cax | grep %s' % deamon
         output = self.exec_command(cmd)
-        return (output)
+        return output
 
     def verify_file(self, file_name):
         cmd = 'cat %s' % file_name
@@ -171,19 +205,20 @@ class RemoteClient():
             dev=dev, destination_ip=destination_ip)
         return self.exec_command(cmd)
 
-    def execute_script(self, cmd, cmd_params, source, destination):
-        try:
-            self.copy_over(source, destination)
-            self.exec_command(
-                'cd ' + destination + '; dos2unix ' + cmd)
-            self.exec_command('chmod +x ' + cmd)
-            cmd_args = ' '.join(str(x) for x in cmd_params)
-            self.exec_command('./' + cmd + ' ' + cmd_args)
 
-        except exceptions.SSHExecCommandFailed as exc:
-            LOG.exception(exc)
-            raise exc
+class FedoraUtils(RemoteClient):
 
-        except Exception as exc:
-            LOG.exception(exc)
-            raise exc
+    def get_os_type(self):
+        return 'fedora'
+
+
+class UbuntuUtils(RemoteClient):
+
+    def get_os_type(self):
+        return 'ubuntu'
+
+
+class Fedora7Utils(RemoteClient):
+
+    def get_os_type(self):
+        return 'fedora7'

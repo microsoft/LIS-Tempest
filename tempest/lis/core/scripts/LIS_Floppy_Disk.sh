@@ -14,22 +14,18 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-
 echoerr() { echo "$@" 1>&2; }
 
-
-#
 # check if floppy module is loaded or not
-#
 echo "Check if floppy module is loaded"
 
-FLOPPY=`lsmod | grep floppy`
+FLOPPY=$(sudo lsmod | grep floppy)
 if [[ $FLOPPY != "" ]] ; then
     echo "Floppy disk  module is present"
 else
     echo "Floppy disk module is not present in VM"
     echo "Loading Floppy disk module..."
-    modprobe floppy
+    sudo modprobe floppy
     sts=$?
     if [ 0 -ne ${sts} ]; then
 	   echoerr "Floppy disk module loaded : Failed!"
@@ -40,11 +36,9 @@ else
     fi
 fi
 
-#
 # Format the floppy disk
-#
 echo "mkfs -t vfat /dev/fd0"
-mkfs -t vfat /dev/fd0
+sudo mkfs -t vfat /dev/fd0
 if [ $? -ne 0 ]; then
     msg="Unable to mkfs -t vfat /dev/fd0"
     echoerr "Error: ${msg}"
@@ -55,7 +49,7 @@ fi
 # Mount the floppy disk
 #
 echo "Mount the floppy disk"
-mount /dev/fd0 /mnt/
+sudo mount /dev/fd0 /mnt/
 sts=$?
 if [ 0 -ne ${sts} ]; then
 	echoerr "Unable to mount the Floppy Disk"
@@ -102,7 +96,7 @@ sts=$?
 
 echo "#### Unmount the floppy disk ####"
 cd ~
-umount /mnt/
+sudo umount /mnt/
 sts=$?
         if [ 0 -ne ${sts} ]; then
 			echoerr "Unable to unmount the floppy disk"

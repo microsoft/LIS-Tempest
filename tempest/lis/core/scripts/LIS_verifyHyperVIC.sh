@@ -22,17 +22,17 @@
 ########################################################################
 
 echoerr() { echo "$@" 1>&2; }
-echo "#### Status of Hyper-V Kernel Modules ####\n"
+echo "#### Status of Hyper-V Kernel Modules ####"
 HYPERV_MODULES=(hv_vmbus hv_netvsc hid_hyperv hv_utils hv_storvsc)
 for module in ${HYPERV_MODULES[@]}; do
-	module_alt=`echo $module|sed -n s/-/_/p`
-	load_status=$( lsmod | grep $module 2>&1)
+	module_alt=$(echo $module | sed -n s/-/_/p)
+	load_status=$(sudo lsmod | grep $module 2>&1)
         module_name=$module
 	if [ "$module_alt" != "" ]; then
 		# Some of our drivers, such as hid-hyperv.ko, is shown as
 		# "hid_hyperv" from lsmod output. We have to replace all
 		# "-" to "_".
-		load_status=$( lsmod | grep $module_alt 2>&1)
+		load_status=$(sudo lsmod | grep $module_alt 2>&1)
 		module_name=$module_alt
 	fi
 
@@ -47,9 +47,7 @@ for module in ${HYPERV_MODULES[@]}; do
 	fi
 done
 
-#
 # Let the caller know everything worked
-#
 if [ "1" -eq "$PASS" ] ; then
 	exit 10
 else
