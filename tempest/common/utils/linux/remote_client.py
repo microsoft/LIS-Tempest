@@ -174,12 +174,12 @@ class RemoteClient(RemoteClientBase):
     def delete_file(self, file_name):
         cmd = 'rm -f %s' % file_name
         output = self.exec_command(cmd)
-        return (output)
+        return output
 
     def verify_deamon(self, deamon):
         cmd = 'ps cax | grep %s' % deamon
         output = self.exec_command(cmd)
-        return (output)
+        return output
 
     def verify_file(self, file_name):
         cmd = 'cat %s' % file_name

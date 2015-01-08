@@ -14,17 +14,15 @@
 
 import os
 from tempest import config
-from tempest.openstack.common import log as logging
-from tempest.lis import manager
-from tempest.scenario import utils as test_utils
-from tempest import test
 from tempest import exceptions
+from tempest import test
+from tempest.lis import manager
+from tempest.openstack.common import log as logging
+from tempest.scenario import utils as test_utils
 
 CONF = config.CONF
 
 LOG = logging.getLogger(__name__)
-
-load_tests = test_utils.load_tests_input_scenario_utils
 
 
 class LisModules(manager.LisBase):
@@ -70,7 +68,7 @@ class LisModules(manager.LisBase):
                                            create_kwargs=create_kwargs)
         self.instance_name = self.instance["OS-EXT-SRV-ATTR:instance_name"]
         self.host_name = self.instance["OS-EXT-SRV-ATTR:hypervisor_hostname"]
-        self._initiate_win_client(self.host_name)
+        self._initiate_host_client(self.host_name)
 
     def nova_floating_ip_create(self):
         _, self.floating_ip = self.floating_ips_client.create_floating_ip()
@@ -94,7 +92,7 @@ class LisModules(manager.LisBase):
         try:
             script_name = 'LIS_verifyHyperVIC.sh'
             script_path = '/scripts/' + script_name
-            destination = '/root/'
+            destination = '/tmp/'
             my_path = os.path.abspath(
                 os.path.normpath(os.path.dirname(__file__)))
             full_script_path = my_path + script_path
@@ -117,7 +115,7 @@ class LisModules(manager.LisBase):
         try:
             script_name = 'CORE_StressReloadModules.sh'
             script_path = '/scripts/' + script_name
-            destination = '/root/'
+            destination = '/tmp/'
             my_path = os.path.abspath(
                 os.path.normpath(os.path.dirname(__file__)))
             full_script_path = my_path + script_path
@@ -130,10 +128,10 @@ class LisModules(manager.LisBase):
             while max_attempts:
                 try:
                     self.linux_client.verify_file('reload_finished')
-                    self.check_heartbeat_status()
+                    self.check_heartbeat_status(self.instance_name)
                     break
                 except exceptions.SSHTimeout as exc:
-                    self.check_heartbeat_status()
+                    self.check_heartbeat_status(self.instance_name)
                     max_attempts -= 1
                     continue
 
@@ -152,6 +150,7 @@ class LisModules(manager.LisBase):
         self._initiate_linux_client(self.floating_ip['ip'],
                                     self.ssh_user, self.keypair['private_key'])
         self.check_lis_modules()
+        self.servers_client.delete_server(self.instance['id'])
 
     @test.attr(type=['core', 'lis_modules'])
     @test.services('compute', 'network')

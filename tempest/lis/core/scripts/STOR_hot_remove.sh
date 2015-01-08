@@ -21,20 +21,19 @@
 #
 ########################################################################
 
-
 expectedDiskCound=$1
 
 ### do fdisk to rescan the scsi bus
-fdisk -l > /dev/null
-fdisk -l > /dev/null
-fdisk -l > /dev/null
-fdisk -l > /dev/null
+sudo fdisk -l > /dev/null
+sudo fdisk -l > /dev/null
+sudo fdisk -l > /dev/null
+sudo fdisk -l > /dev/null
 
 #
 # Compute the number of sd* drives on the system.
 #
 sdCount=0
-sdCount=`fdisk -l | grep "Disk /dev/sd*" | wc -l`
+sdCount=$(sudo fdisk -l | grep "Disk /dev/sd*" | wc -l)
 sdCount=$((sdCount-1))
 
 if [ $sdCount == $expectedDiskCound ]; then

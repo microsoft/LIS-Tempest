@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Cloudbase Solutions Srl
+# Copyright 2015 Cloudbase Solutions Srl
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
 #    not use this file except in compliance with the License. You may obtain
@@ -14,21 +14,18 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-
 echoerr() { echo "$@" 1>&2; }
 
 cd ~
 
-#
 # check if CDROM  module is loaded or no
-#
-CD=`lsmod | grep ata_piix`
+CD=$(sudo lsmod | grep ata_piix)
 if [[ $CD != "" ]] ; then
 	echo "ata_piix module is present"
 else
 	echo "ata_piix module is not present in VM"
 	echo "Loading ata_piix module "
-	insmod /lib/modules/`uname -r`/kernel/drivers/ata/ata_piix.ko
+	sudo insmod /lib/modules/`uname -r`/kernel/drivers/ata/ata_piix.ko
 	sts=$?
     if [ 0 -ne ${sts} ]; then
         echoerr "Unable to load ata_piix module"
@@ -41,7 +38,7 @@ fi
 
 
 echo "##### Mount the CDROM #####"
-mount /dev/dvd /mnt/
+sudo mount /dev/dvd /mnt/
 sts=$?
     if [ 0 -ne ${sts} ]; then
         echoerr "Unable to mount the CDROM"
@@ -64,7 +61,7 @@ sts=$?
 	    echo "Data read inside CDROM : Success"
     fi
 cd ~
-umount /mnt/
+sudo umount /mnt/
 sts=$?
     if [ 0 -ne ${sts} ]; then
         echoerr "Unable to unmount the CDROM"

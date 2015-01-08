@@ -3,6 +3,9 @@
 # $2 == Bridge netmask
 # $3 - $# == Interfaces to attach to bridge
 # if no parameter is given outside of IP and Netmask, all interfaces will be added (except lo)
+
+sudo su
+
 LogMsg()
 {
 	echo $(date "+%a %b %d %T %Y") : "${1}"  >> ~/$0.log
