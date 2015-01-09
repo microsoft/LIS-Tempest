@@ -2512,6 +2512,10 @@ class LisBase(ScenarioTest):
         self.servers_client.stop(vm_id)
         self.servers_client.wait_for_server_status(vm_id, 'SHUTOFF')
 
+    def pause_vm(self, vm_id):
+        self.servers_client.pause_server(vm_id)
+        self.servers_client.wait_for_server_status(vm_id, 'PAUSED')
+
     def add_disk(self, instance_name, disk_type,
                  position, vhd_type, sec_size, size='1GB'):
         """Attach Disk to VM"""
@@ -2555,6 +2559,22 @@ class LisBase(ScenarioTest):
                               str(ctrl_id), str(ctrl_loc), passVhd]) + '.*'
         self.addCleanup(self.remove_disk, instance_name, disk_name)
         self.disks.append(disk_name)
+
+    def create_pass_drive(self, instance_name):
+        """Create a passthrough disk, mounts it, creates a volume and mounts as drive.
+        Returns drive letter;
+        """
+        passVhd = 'backup_disk'
+        script_location = "%s%s" % (self.script_folder,
+                                    'setupscripts\\create_backup_drive.ps1')
+        output = self.host_client.run_powershell_cmd(
+            script_location,
+            vmName=instance_name,
+            hvServer=self.host_name)
+
+        disk_name = '-'.join([instance_name, passVhd]) + '.*'
+        self.addCleanup(self.remove_disk, instance_name, disk_name)
+        return output.strip()
 
     def add_diff_disk(self, instance_name, position, vhd_type):
         """Attach diff Disk to VM"""

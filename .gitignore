@@ -24,3 +24,4 @@ test_lists/
 subunit2html.py
 results.html
 
+tempest/lis/vss/test_vss_basic.py

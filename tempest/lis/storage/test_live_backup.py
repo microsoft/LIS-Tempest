@@ -1,0 +1,342 @@
+# Copyright 2015 Cloudbase Solutions Srl
+#
+#    Licensed under the Apache License, Version 2.0 (the "License"); you may
+#    not use this file except in compliance with the License. You may obtain
+#    a copy of the License at
+#
+#         http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+#    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+#    License for the specific language governing permissions and limitations
+#    under the License.
+
+import os
+from tempest import config
+from tempest import exceptions
+from tempest import test
+from tempest.lis import manager
+from tempest.openstack.common import log as logging
+from tempest.scenario import utils as test_utils
+
+CONF = config.CONF
+
+LOG = logging.getLogger(__name__)
+
+
+class VSS(manager.LisBase):
+
+    def setUp(self):
+        super(VSS, self).setUp()
+        # Setup image and flavor the test instance
+        # Support both configured and injected values
+        if not hasattr(self, 'image_ref'):
+            self.image_ref = CONF.compute.image_ref
+        if not hasattr(self, 'flavor_ref'):
+            self.flavor_ref = CONF.compute.flavor_ref
+        self.image_utils = test_utils.ImageUtils()
+        if not self.image_utils.is_flavor_enough(self.flavor_ref,
+                                                 self.image_ref):
+            raise self.skipException(
+                '{image} does not fit in {flavor}'.format(
+                    image=self.image_ref, flavor=self.flavor_ref
+                )
+            )
+        self.host_name = ""
+        self.instance_name = ""
+        self.filename = '~/testfile.txt'
+        self.run_ssh = CONF.compute.run_ssh and \
+            self.image_utils.is_sshable_image(self.image_ref)
+        self.ssh_user = CONF.compute.ssh_user
+        LOG.debug('Starting test for i:{image}, f:{flavor}. '
+                  'Run ssh: {ssh}, user: {ssh_user}'.format(
+                      image=self.image_ref, flavor=self.flavor_ref,
+                      ssh=self.run_ssh, ssh_user=self.ssh_user))
+
+    def add_keypair(self):
+        self.keypair = self.create_keypair()
+
+    def boot_instance(self):
+        # Create server with image and flavor from input scenario
+        security_groups = [self.security_group]
+        create_kwargs = {
+            'key_name': self.keypair['name'],
+            'security_groups': security_groups
+        }
+        self.instance = self.create_server(image=self.image_ref,
+                                           flavor=self.flavor_ref,
+                                           create_kwargs=create_kwargs)
+        self.instance_name = self.instance["OS-EXT-SRV-ATTR:instance_name"]
+        self.host_name = self.instance["OS-EXT-SRV-ATTR:hypervisor_hostname"]
+        self._initiate_host_client(self.host_name)
+
+    def nova_floating_ip_create(self):
+        _, self.floating_ip = self.floating_ips_client.create_floating_ip()
+        self.addCleanup(self.delete_wrapper,
+                        self.floating_ips_client.delete_floating_ip,
+                        self.floating_ip['id'])
+
+    def nova_floating_ip_add(self):
+        self.floating_ips_client.associate_floating_ip_to_server(
+            self.floating_ip['ip'], self.instance['id'])
+
+    def spawn_vm(self):
+        self.add_keypair()
+        self.security_group = self._create_security_group()
+        self.boot_instance()
+        self.nova_floating_ip_create()
+        self.nova_floating_ip_add()
+        self.server_id = self.instance['id']
+
+    def check_vss_deamon(self):
+        """ Check if hv_vss_deamon runs on the vm """
+        output = self.linux_client.verify_vss_deamon()
+        self.assertIsNotNone(output, 'VSS daemon not present.')
+
+    def create_file(self):
+        """ Create a file on the vm """
+        output = self.linux_client.create_file(self.filename)
+        LOG.info('Created file %s' % output)
+        self.assertIsNotNone(output)
+
+    def verify_file(self):
+        """ Verify if the file exists on the vm """
+        output = self.linux_client.verify_file(self.filename)
+        LOG.info('File is present on the VM. ')
+        self.assertIsNotNone(output)
+
+    def delete_file(self):
+        """ Delete the file from the vm """
+        self.linux_client.delete_file(self.filename)
+        LOG.info('Deleting file from the the VM.')
+
+    def backup_vm(self):
+        """Take a VSS live backup of the VM"""
+        script_location = "%s%s" % (self.script_folder,
+                                    'setupscripts\\vss_backup.ps1')
+        self.host_client.run_powershell_cmd(
+            script_location,
+            hvServer=self.host_name,
+            vmName=self.instance_name,
+            targetDrive=self.target_drive)
+
+    def restore_vm(self):
+        """Restore the VM"""
+        script_location = "%s%s" % (self.script_folder,
+                                    'setupscripts\\vss_restore.ps1')
+        self.host_client.run_powershell_cmd(
+            script_location,
+            hvServer=self.host_name,
+            vmName=self.instance_name,
+            targetDrive=self.target_drive)
+
+    def _add_disks(self, pos, vhd_type, exc_dsk_cnt, filesystem):
+        self.stop_vm(self.server_id)
+        if isinstance(pos, list):
+            for position in pos:
+                self.add_disk(self.instance_name, self.disk_type,
+                              position, vhd_type, self.sector_size)
+        else:
+            self.add_disk(self.instance_name, self.disk_type,
+                          pos, vhd_type, self.sector_size)
+        self.start_vm(self.server_id)
+        self.linux_client.validate_authentication()
+        self.format_disk(exc_dsk_cnt, filesystem)
+
+    def _test_passthrough(self, count, exc_dsk_cnt, filesystem):
+        self.disks = []
+        for dev in count:
+            disk = self.add_passthrough_disk(dev)
+            self.disks.append(disk)
+        try:
+            self.format_disk(exc_dsk_cnt, filesystem)
+            drive = self.create_pass_drive(self.instance_name)
+            self.target_drive = drive + ':'
+            self.backup_vm()
+            self.restore_vm()
+
+        except Exception as exc:
+            LOG.exception(exc)
+            self._log_console_output()
+            raise exc
+        finally:
+            for disk in self.disks:
+                self.detach_passthrough(disk)
+
+    def _test_pass_ide(self, pos, exc_dsk_cnt, filesystem):
+        if isinstance(pos, list):
+            for position in pos:
+                self.add_pass_disk(self.instance_name, position)
+        else:
+            self.add_pass_disk(self.instance_name, pos)
+        self.format_disk(exc_dsk_cnt, filesystem)
+
+    @test.attr(type=['smoke', 'storage', 'live_backup'])
+    @test.services('compute', 'network')
+    def test_check_vss_daemon(self):
+        self.spawn_vm()
+        self._initiate_linux_client(self.floating_ip['ip'],
+                                    self.ssh_user, self.keypair['private_key'])
+        self.check_vss_deamon()
+        self.servers_client.delete_server(self.instance['id'])
+
+    @test.attr(type=['smoke', 'storage', 'live_backup'])
+    @test.services('compute', 'network')
+    def test_vss_backup_restore(self):
+        self.spawn_vm()
+        self._initiate_linux_client(self.floating_ip['ip'],
+                                    self.ssh_user, self.keypair['private_key'])
+        self.check_vss_deamon()
+        drive = self.create_pass_drive(self.instance_name)
+        self.target_drive = drive + ':'
+        self.backup_vm()
+        self.restore_vm()
+        self.servers_client.delete_server(self.instance['id'])
+
+    @test.attr(type=['storage', 'live_backup'])
+    @test.services('compute', 'network')
+    def test_vss_backup_restore_ext3(self):
+        self.sector_size = 512
+        self.disk_type = 'vhd'
+        self.disks = []
+        self.spawn_vm()
+        self._initiate_linux_client(self.floating_ip['ip'],
+                                    self.ssh_user, self.keypair['private_key'])
+        self.check_vss_deamon()
+        pos = [('IDE', 0, 1), ('SCSI', 0, 1)]
+        self._add_disks(pos, 'DYNAMIC', 2, 'ext3')
+        drive = self.create_pass_drive(self.instance_name)
+        self.target_drive = drive + ':'
+        self.backup_vm()
+        self.restore_vm()
+        self.servers_client.delete_server(self.instance['id'])
+
+    @test.attr(type=['storage', 'live_backup'])
+    @test.services('compute', 'network')
+    def test_vss_backup_restore_ext4(self):
+        self.sector_size = 512
+        self.disk_type = 'vhd'
+        self.disks = []
+        self.spawn_vm()
+        self._initiate_linux_client(self.floating_ip['ip'],
+                                    self.ssh_user, self.keypair['private_key'])
+        self.check_vss_deamon()
+        pos = [('IDE', 0, 1), ('SCSI', 0, 1)]
+        self._add_disks(pos, 'DYNAMIC', 2, 'ext4')
+        drive = self.create_pass_drive(self.instance_name)
+        self.target_drive = drive + ':'
+        self.backup_vm()
+        self.restore_vm()
+        self.servers_client.delete_server(self.instance['id'])
+
+    @test.attr(type=['storage', 'live_backup'])
+    @test.services('compute', 'network')
+    def test_vss_backup_restore_reiserfs(self):
+        self.sector_size = 512
+        self.disk_type = 'vhd'
+        self.disks = []
+        self.spawn_vm()
+        self._initiate_linux_client(self.floating_ip['ip'],
+                                    self.ssh_user, self.keypair['private_key'])
+        self.check_vss_deamon()
+        pos = [('IDE', 0, 1), ('SCSI', 0, 1)]
+        self._add_disks(pos, 'DYNAMIC', 2, 'reiserfs')
+        drive = self.create_pass_drive(self.instance_name)
+        self.target_drive = drive + ':'
+        self.backup_vm()
+        self.restore_vm()
+        self.servers_client.delete_server(self.instance['id'])
+
+    @test.attr(type=['storage', 'live_backup'])
+    @test.services('compute', 'network')
+    def test_vss_backup_restore_vhd_attached(self):
+        self.sector_size = 512
+        self.disk_type = 'vhd'
+        self.disks = []
+        self.spawn_vm()
+        self._initiate_linux_client(self.floating_ip['ip'],
+                                    self.ssh_user, self.keypair['private_key'])
+        self.check_vss_deamon()
+        pos = [('IDE', 0, 1), ('SCSI', 0, 1)]
+        self._add_disks(pos, 'DYNAMIC', 2, 'ext3')
+        drive = self.create_pass_drive(self.instance_name)
+        self.target_drive = drive + ':'
+        self.backup_vm()
+        self.restore_vm()
+        self.servers_client.delete_server(self.instance['id'])
+
+    @test.attr(type=['storage', 'live_backup'])
+    @test.services('compute', 'network')
+    def test_vss_backup_restore_vhdx_attached(self):
+        self.sector_size = 512
+        self.disk_type = 'vhdx'
+        self.disks = []
+        self.spawn_vm()
+        self._initiate_linux_client(self.floating_ip['ip'],
+                                    self.ssh_user, self.keypair['private_key'])
+        self.check_vss_deamon()
+        pos = [('IDE', 0, 1), ('SCSI', 0, 1)]
+        self._add_disks(pos, 'DYNAMIC', 2, 'ext3')
+        drive = self.create_pass_drive(self.instance_name)
+        self.target_drive = drive + ':'
+        self.backup_vm()
+        self.restore_vm()
+        self.servers_client.delete_server(self.instance['id'])
+
+    @test.attr(type=['smoke', 'storage', 'live_backup'])
+    @test.services('compute', 'network')
+    def test_vss_backup_restore_file(self):
+        self.spawn_vm()
+        self._initiate_linux_client(self.floating_ip['ip'],
+                                    self.ssh_user, self.keypair['private_key'])
+        self.check_vss_deamon()
+        self.create_file()
+        drive = self.create_pass_drive(self.instance_name)
+        self.target_drive = drive + ':'
+        self.backup_vm()
+        self.delete_file()
+        self.restore_vm()
+        self.verify_file()
+        self.servers_client.delete_server(self.instance['id'])
+
+    @test.attr(type=['smoke', 'storage', 'live_backup'])
+    @test.services('compute', 'network')
+    def test_vss_backup_restore_stop_state(self):
+        self.spawn_vm()
+        self._initiate_linux_client(self.floating_ip['ip'],
+                                    self.ssh_user, self.keypair['private_key'])
+        self.check_vss_deamon()
+        self.stop_vm(self.server_id)
+        drive = self.create_pass_drive(self.instance_name)
+        self.target_drive = drive + ':'
+        self.backup_vm()
+        self.restore_vm()
+        self.servers_client.delete_server(self.instance['id'])
+
+    @test.attr(type=['smoke', 'storage', 'live_backup'])
+    @test.services('compute', 'network')
+    def test_vss_backup_restore_pause_state(self):
+        self.spawn_vm()
+        self._initiate_linux_client(self.floating_ip['ip'],
+                                    self.ssh_user, self.keypair['private_key'])
+        self.check_vss_deamon()
+        self.pause_vm(self.server_id)
+        drive = self.create_pass_drive(self.instance_name)
+        self.target_drive = drive + ':'
+        self.backup_vm()
+        self.restore_vm()
+        self.servers_client.delete_server(self.instance['id'])
+
+    @test.attr(type=['smoke', 'storage', 'live_backup'])
+    @test.services('compute', 'network')
+    def test_vss_backup_restore_passthrough_ext4(self):
+        self.sector_size = 512
+        self.disk_type = 'passthrough'
+        self.disks = []
+        self.spawn_vm()
+        self._initiate_linux_client(self.floating_ip['ip'],
+                                    self.ssh_user, self.keypair['private_key'])
+        self.check_vss_deamon()
+        self._test_pass_ide(('SCSI', 0, 0), 1, 'ext3')
+        self.servers_client.delete_server(self.instance['id'])
