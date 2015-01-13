@@ -2745,6 +2745,28 @@ class LisBase(ScenarioTest):
         self.linux_client.execute_script(
             script_name, cmd_params, full_script_path, destination)
 
+    def freeze_fs(self, expected_disk_count, filesystem):
+        script_name = 'STOR_VSS_Disk_Fail.sh'
+        script_path = '/storage/scripts/' + script_name
+        destination = '/tmp/'
+        my_path = os.path.abspath(
+            os.path.normpath(os.path.dirname(__file__)))
+        full_script_path = my_path + script_path
+        cmd_params = [expected_disk_count, filesystem]
+        self.linux_client.execute_script(
+            script_name, cmd_params, full_script_path, destination)
+
+    def stress_disk(self):
+        script_name = 'STOR_VSS_Disk_Stress.sh'
+        script_path = '/storage/scripts/' + script_name
+        destination = '/tmp/'
+        my_path = os.path.abspath(
+            os.path.normpath(os.path.dirname(__file__)))
+        full_script_path = my_path + script_path
+        cmd_params = []
+        self.linux_client.execute_script(
+            script_name, cmd_params, full_script_path, destination)
+
     def count_disks(self):
         try:
             self.linux_client.get_disks_count(30)
@@ -2791,6 +2813,17 @@ class LisBase(ScenarioTest):
         self.linux_client.execute_script(
             script_name, cmd_params, full_script_path, destination)
 
+    def stop_network(self):
+        script_name = 'STOR_VSS_StopNetwork.sh'
+        script_path = '/storage/scripts/' + script_name
+        destination = '/tmp/'
+        my_path = os.path.abspath(
+            os.path.normpath(os.path.dirname(__file__)))
+        full_script_path = my_path + script_path
+        cmd_params = []
+        self.linux_client.execute_script(
+            script_name, cmd_params, full_script_path, destination)
+
     def get_vm_time(self):
         unix_time = self.linux_client.get_unix_time()
         LOG.debug('VM unix time %s ', unix_time)
@@ -2811,3 +2844,26 @@ class LisBase(ScenarioTest):
                                 'output': s_out,
                                 'error': s_err})
         return int(s_out)
+
+    def create_server_snapshot(self, server_id, name=None):
+        # Glance client
+        _image_client = self.image_client
+        # Compute client
+        _images_client = self.images_client
+        if name is None:
+            name = data_utils.rand_name('scenario-snapshot-')
+        LOG.debug("Creating a snapshot image for server_id: %s", server_id)
+        resp, image = _images_client.create_image(server_id, name)
+        image_id = resp['location'].split('images/')[1]
+        _image_client.wait_for_image_status(image_id, 'active')
+        self.addCleanup_with_wait(
+            waiter_callable=_image_client.wait_for_resource_deletion,
+            thing_id=image_id, thing_id_param='id',
+            cleanup_callable=self.delete_wrapper,
+            cleanup_args=[_image_client.delete_image, image_id])
+        _, snapshot_image = _image_client.get_image_meta(image_id)
+        image_name = snapshot_image['name']
+        self.assertEqual(name, image_name)
+        LOG.debug("Created snapshot image %s for server %s",
+                  image_name, self.server_id)
+        return snapshot_image

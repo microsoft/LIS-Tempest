@@ -29,6 +29,7 @@ LOG = log.getLogger(__name__)
 
 class RemoteClientBase():
 
+    SCRIPTS_BASE_PATH = 'tempest/lis/bash-scripts/'
     # NOTE(afazekas): It should always get an address instead of server
 
     def __init__(self, server, username, password=None, pkey=None):
@@ -53,9 +54,12 @@ class RemoteClientBase():
     def get_os_type(self):
         script_name = 'get_os.sh'
         destination = '/tmp/'
-        my_path = os.path.abspath(
-            os.path.normpath(os.path.dirname(__file__)))
-        full_script_path = my_path + '/' + script_name
+
+        script_path = self.SCRIPTS_BASE_PATH + script_name
+        full_script_path = os.path.abspath(
+            os.path.normpath(
+                os.path.join(os.getcwd(), script_path)))
+
         cmd_params = []
         distro = self.execute_script(
             script_name, cmd_params, full_script_path, destination)
@@ -76,6 +80,12 @@ class RemoteClientBase():
 
     def execute_script(self, cmd, cmd_params, source, destination):
         try:
+            utils_name = 'utils.sh'
+            utils_path = self.SCRIPTS_BASE_PATH + utils_name
+            utils_source = os.path.abspath(
+                os.path.normpath(
+                    os.path.join(os.getcwd(), utils_path)))
+            self.copy_over(utils_source, destination)
             self.copy_over(source, destination)
             cmd_args = ' '.join(str(x) for x in cmd_params)
             command = ('cd %(dest)s; chmod +x %(cmd)s; '
@@ -178,6 +188,8 @@ class RemoteClient(RemoteClientBase):
 
     def verify_deamon(self, deamon):
         cmd = 'ps cax | grep %s' % deamon
+        import pdb
+        pdb.set_trace()
         output = self.exec_command(cmd)
         return output
 
@@ -208,16 +220,17 @@ class RemoteClient(RemoteClientBase):
     def verify_vss_deamon(self):
         return self.verify_deamon('hv_vss_daemon')
 
+
 class FedoraUtils(RemoteClient):
 
     def get_os_type(self):
         return 'fedora'
 
 
-class UbuntuUtils(RemoteClient):
+class DebianUtils(RemoteClient):
 
     def get_os_type(self):
-        return 'ubuntu'
+        return 'debian'
 
 
 class Fedora7Utils(RemoteClient):

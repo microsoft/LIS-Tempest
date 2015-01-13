@@ -141,17 +141,7 @@ function is_ubuntu {
 }
 
 
-echoerr() { echo "$@" 1>&2; }
-echo "#### NTP time syncronization test ####"
-
-# # Check if the timezone parameter is present
-# if [[ -z $1 ]]; then
-#     echoerr "ERROR: You must provide a TZONE variable as a parameter!"
-#     # exit 10
-# fi
-
-# Check on what distro we are running
-# rhel, centos, etc..
+function installIozone {
 if is_fedora ; then
     # Check if ntpd is running. On Fedora based distros we have ntpstat.
     sudo ntpstat 1> /dev/null 2> /dev/null
@@ -216,29 +206,4 @@ else
     echoerr "Distro not suported. Aborting"
     exit 10
 fi
-
-
-# We wait 10 seconds for the ntp server to sync
-sleep 10
-
-# Now let's see if the VM is in sync with ntp server
-ntpq -p
-if [[ $? -ne 0 ]]; then
-    echoerr "Unable to query NTP deamon!"
-    exit 10
-fi
-# loopinfo returns the offset between the ntp server and internal clock
-delay=$(ntpdc -c loopinfo | awk 'NR==1 {print $2}')
-
-# Using awk for float comparison
-check=$(echo "$delay $maxdelay" | awk '{if ($1 < $2) print 0; else print 1}')
-
-if [[ 0 -ne $check ]] ; then
-    echoerr "ERROR: NTP Time out of sync. Test Failed"
-    echo "NTP offset is $delay seconds."
-    exit 10
-fi
-
-# If we reached this point, time is synced.
-echo "NTP offset is $delay seconds."
-echo "SUCCES: NTP time synced!"
+}

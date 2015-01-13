@@ -57,19 +57,30 @@ class VSS(manager.LisBase):
     def add_keypair(self):
         self.keypair = self.create_keypair()
 
+    def boot_child_instance(self, image_id, host):
+        # Create server with image and flavor from input scenario
+        security_groups = [self.security_group]
+        create_kwargs = {
+            'key_name': self.keypair['name'],
+            'security_groups': security_groups,
+            'availability_zone': 'nova:%s' % host
+
+        }
+        return self.create_server(image=image_id,
+                                  flavor=self.flavor_ref,
+                                  create_kwargs=create_kwargs)
+
     def boot_instance(self):
         # Create server with image and flavor from input scenario
         security_groups = [self.security_group]
         create_kwargs = {
             'key_name': self.keypair['name'],
-            'security_groups': security_groups
+            'security_groups': security_groups,
+
         }
-        self.instance = self.create_server(image=self.image_ref,
-                                           flavor=self.flavor_ref,
-                                           create_kwargs=create_kwargs)
-        self.instance_name = self.instance["OS-EXT-SRV-ATTR:instance_name"]
-        self.host_name = self.instance["OS-EXT-SRV-ATTR:hypervisor_hostname"]
-        self._initiate_host_client(self.host_name)
+        return self.create_server(image=self.image_ref,
+                                  flavor=self.flavor_ref,
+                                  create_kwargs=create_kwargs)
 
     def nova_floating_ip_create(self):
         _, self.floating_ip = self.floating_ips_client.create_floating_ip()
@@ -77,16 +88,19 @@ class VSS(manager.LisBase):
                         self.floating_ips_client.delete_floating_ip,
                         self.floating_ip['id'])
 
-    def nova_floating_ip_add(self):
+    def nova_floating_ip_add(self, instance_id):
         self.floating_ips_client.associate_floating_ip_to_server(
-            self.floating_ip['ip'], self.instance['id'])
+            self.floating_ip['ip'], instance_id)
 
     def spawn_vm(self):
         self.add_keypair()
         self.security_group = self._create_security_group()
-        self.boot_instance()
+        self.instance = self.boot_instance()
+        self.instance_name = self.instance["OS-EXT-SRV-ATTR:instance_name"]
+        self.host_name = self.instance["OS-EXT-SRV-ATTR:hypervisor_hostname"]
+        self._initiate_host_client(self.host_name)
         self.nova_floating_ip_create()
-        self.nova_floating_ip_add()
+        self.nova_floating_ip_add(self.instance['id'])
         self.server_id = self.instance['id']
 
     def check_vss_deamon(self):
@@ -111,24 +125,34 @@ class VSS(manager.LisBase):
         self.linux_client.delete_file(self.filename)
         LOG.info('Deleting file from the the VM.')
 
-    def backup_vm(self):
+    def backup_vm(self, instance_name):
         """Take a VSS live backup of the VM"""
         script_location = "%s%s" % (self.script_folder,
                                     'setupscripts\\vss_backup.ps1')
         self.host_client.run_powershell_cmd(
             script_location,
             hvServer=self.host_name,
-            vmName=self.instance_name,
+            vmName=instance_name,
             targetDrive=self.target_drive)
 
-    def restore_vm(self):
+    def backup_vm_fail(self, instance_name):
+        """Take a VSS live backup of the VM"""
+        script_location = "%s%s" % (self.script_folder,
+                                    'setupscripts\\vss_backup_fail.ps1')
+        self.host_client.run_powershell_cmd(
+            script_location,
+            hvServer=self.host_name,
+            vmName=instance_name,
+            targetDrive=self.target_drive)
+
+    def restore_vm(self, instance_name):
         """Restore the VM"""
         script_location = "%s%s" % (self.script_folder,
                                     'setupscripts\\vss_restore.ps1')
         self.host_client.run_powershell_cmd(
             script_location,
             hvServer=self.host_name,
-            vmName=self.instance_name,
+            vmName=instance_name,
             targetDrive=self.target_drive)
 
     def _add_disks(self, pos, vhd_type, exc_dsk_cnt, filesystem):
@@ -153,8 +177,8 @@ class VSS(manager.LisBase):
             self.format_disk(exc_dsk_cnt, filesystem)
             drive = self.create_pass_drive(self.instance_name)
             self.target_drive = drive + ':'
-            self.backup_vm()
-            self.restore_vm()
+            self.backup_vm(self.instance_name)
+            self.restore_vm(self.instance_name)
 
         except Exception as exc:
             LOG.exception(exc)
@@ -171,6 +195,29 @@ class VSS(manager.LisBase):
         else:
             self.add_pass_disk(self.instance_name, pos)
         self.format_disk(exc_dsk_cnt, filesystem)
+
+
+    def create_child_vm(self, server_id):
+        temp_image = self.create_server_snapshot(server_id)
+        self.instance = self.boot_child_instance(
+            temp_image['id'], self.instance["OS-EXT-SRV-ATTR:host"])
+        self.servers_client.delete_server(self.server_id)
+        self.instance_name = self.instance["OS-EXT-SRV-ATTR:instance_name"]
+        self.nova_floating_ip_add(self.instance['id'])
+        self.server_id = self.instance['id']
+
+    def _add_disk_fail(self, pos, vhd_type, exc_dsk_cnt, filesystem):
+        self.stop_vm(self.server_id)
+        if isinstance(pos, list):
+            for position in pos:
+                self.add_disk(self.instance_name, self.disk_type,
+                              position, vhd_type, self.sector_size)
+        else:
+            self.add_disk(self.instance_name, self.disk_type,
+                          pos, vhd_type, self.sector_size)
+        self.start_vm(self.server_id)
+        self.linux_client.validate_authentication()
+        self.freeze_fs(exc_dsk_cnt, filesystem)
 
     @test.attr(type=['smoke', 'storage', 'live_backup'])
     @test.services('compute', 'network')
@@ -190,8 +237,8 @@ class VSS(manager.LisBase):
         self.check_vss_deamon()
         drive = self.create_pass_drive(self.instance_name)
         self.target_drive = drive + ':'
-        self.backup_vm()
-        self.restore_vm()
+        self.backup_vm(self.instance_name)
+        self.restore_vm(self.instance_name)
         self.servers_client.delete_server(self.instance['id'])
 
     @test.attr(type=['storage', 'live_backup'])
@@ -208,8 +255,8 @@ class VSS(manager.LisBase):
         self._add_disks(pos, 'DYNAMIC', 2, 'ext3')
         drive = self.create_pass_drive(self.instance_name)
         self.target_drive = drive + ':'
-        self.backup_vm()
-        self.restore_vm()
+        self.backup_vm(self.instance_name)
+        self.restore_vm(self.instance_name)
         self.servers_client.delete_server(self.instance['id'])
 
     @test.attr(type=['storage', 'live_backup'])
@@ -226,8 +273,8 @@ class VSS(manager.LisBase):
         self._add_disks(pos, 'DYNAMIC', 2, 'ext4')
         drive = self.create_pass_drive(self.instance_name)
         self.target_drive = drive + ':'
-        self.backup_vm()
-        self.restore_vm()
+        self.backup_vm(self.instance_name)
+        self.restore_vm(self.instance_name)
         self.servers_client.delete_server(self.instance['id'])
 
     @test.attr(type=['storage', 'live_backup'])
@@ -244,8 +291,8 @@ class VSS(manager.LisBase):
         self._add_disks(pos, 'DYNAMIC', 2, 'reiserfs')
         drive = self.create_pass_drive(self.instance_name)
         self.target_drive = drive + ':'
-        self.backup_vm()
-        self.restore_vm()
+        self.backup_vm(self.instance_name)
+        self.restore_vm(self.instance_name)
         self.servers_client.delete_server(self.instance['id'])
 
     @test.attr(type=['storage', 'live_backup'])
@@ -262,8 +309,8 @@ class VSS(manager.LisBase):
         self._add_disks(pos, 'DYNAMIC', 2, 'ext3')
         drive = self.create_pass_drive(self.instance_name)
         self.target_drive = drive + ':'
-        self.backup_vm()
-        self.restore_vm()
+        self.backup_vm(self.instance_name)
+        self.restore_vm(self.instance_name)
         self.servers_client.delete_server(self.instance['id'])
 
     @test.attr(type=['storage', 'live_backup'])
@@ -280,8 +327,8 @@ class VSS(manager.LisBase):
         self._add_disks(pos, 'DYNAMIC', 2, 'ext3')
         drive = self.create_pass_drive(self.instance_name)
         self.target_drive = drive + ':'
-        self.backup_vm()
-        self.restore_vm()
+        self.backup_vm(self.instance_name)
+        self.restore_vm(self.instance_name)
         self.servers_client.delete_server(self.instance['id'])
 
     @test.attr(type=['smoke', 'storage', 'live_backup'])
@@ -294,9 +341,9 @@ class VSS(manager.LisBase):
         self.create_file()
         drive = self.create_pass_drive(self.instance_name)
         self.target_drive = drive + ':'
-        self.backup_vm()
+        self.backup_vm(self.instance_name)
         self.delete_file()
-        self.restore_vm()
+        self.restore_vm(self.instance_name)
         self.verify_file()
         self.servers_client.delete_server(self.instance['id'])
 
@@ -310,8 +357,8 @@ class VSS(manager.LisBase):
         self.stop_vm(self.server_id)
         drive = self.create_pass_drive(self.instance_name)
         self.target_drive = drive + ':'
-        self.backup_vm()
-        self.restore_vm()
+        self.backup_vm(self.instance_name)
+        self.restore_vm(self.instance_name)
         self.servers_client.delete_server(self.instance['id'])
 
     @test.attr(type=['smoke', 'storage', 'live_backup'])
@@ -324,8 +371,8 @@ class VSS(manager.LisBase):
         self.pause_vm(self.server_id)
         drive = self.create_pass_drive(self.instance_name)
         self.target_drive = drive + ':'
-        self.backup_vm()
-        self.restore_vm()
+        self.backup_vm(self.instance_name)
+        self.restore_vm(self.instance_name)
         self.servers_client.delete_server(self.instance['id'])
 
     @test.attr(type=['smoke', 'storage', 'live_backup'])
@@ -339,4 +386,85 @@ class VSS(manager.LisBase):
                                     self.ssh_user, self.keypair['private_key'])
         self.check_vss_deamon()
         self._test_pass_ide(('SCSI', 0, 0), 1, 'ext3')
+        self.servers_client.delete_server(self.instance['id'])
+
+    @test.attr(type=['smoke', 'storage', 'live_backup'])
+    @test.services('compute', 'network')
+    def test_vss_backup_restore_iscsi(self):
+        self.sector_size = 512
+        self.disk_type = 'passthrough'
+        self.disks = []
+        self.spawn_vm()
+        self._initiate_linux_client(self.floating_ip['ip'],
+                                    self.ssh_user, self.keypair['private_key'])
+        self.check_vss_deamon()
+        self._test_passthrough(['c', 'b'], 2, 'ext3')
+        self.servers_client.delete_server(self.instance['id'])
+
+    @test.attr(type=['smoke', 'storage', 'live_backup'])
+    @test.services('compute', 'network')
+    def test_vss_backup_restore_no_network(self):
+        self.sector_size = 512
+        self.spawn_vm()
+        self._initiate_linux_client(self.floating_ip['ip'],
+                                    self.ssh_user, self.keypair['private_key'])
+        self.check_vss_deamon()
+        try:
+            self.stop_network()
+        except exceptions.TimeoutException:
+            pass
+        except Exception as exc:
+            LOG.exception(exc)
+            raise exc
+
+        drive = self.create_pass_drive(self.instance_name)
+        self.target_drive = drive + ':'
+        self.backup_vm(self.instance_name)
+        self.restore_vm(self.instance_name)
+        self.servers_client.delete_server(self.instance['id'])
+
+    @test.attr(type=['smoke', 'storage', 'live_backup'])
+    @test.services('compute', 'network')
+    def test_vss_backup_restore_3chained(self):
+        self.spawn_vm()
+        self._initiate_linux_client(self.floating_ip['ip'],
+                                    self.ssh_user, self.keypair['private_key'])
+        self.check_vss_deamon()
+        self.create_child_vm(self.server_id)
+        drive = self.create_pass_drive(self.instance_name)
+        self.target_drive = drive + ':'
+        self.stop_vm(self.server_id)
+        self.backup_vm(self.instance_name)
+        self.restore_vm(self.instance_name)
+        self.servers_client.delete_server(self.instance['id'])
+
+    @test.attr(type=['smoke', 'storage', 'live_backup'])
+    @test.services('compute', 'network')
+    def test_vss_backup_restore_fail(self):
+        self.sector_size = 512
+        self.disk_type = 'vhd'
+        self.disks = []
+        self.spawn_vm()
+        self._initiate_linux_client(self.floating_ip['ip'],
+                                    self.ssh_user, self.keypair['private_key'])
+        self.check_vss_deamon()
+        pos = [('IDE', 0, 1)]
+        self._add_disk_fail(pos, 'DYNAMIC', 1, 'ext3')
+        drive = self.create_pass_drive(self.instance_name)
+        self.target_drive = drive + ':'
+        self.backup_vm_fail(self.instance_name)
+        self.servers_client.delete_server(self.instance['id'])
+
+    @test.attr(type=['smoke', 'storage', 'live_backup'])
+    @test.services('compute', 'network')
+    def test_vss_backup_restore_stress(self):
+        self.spawn_vm()
+        self._initiate_linux_client(self.floating_ip['ip'],
+                                    self.ssh_user, self.keypair['private_key'])
+        self.check_vss_deamon()
+        self.stress_disk()
+        drive = self.create_pass_drive(self.instance_name)
+        self.target_drive = drive + ':'
+        self.backup_vm(self.instance_name)
+        self.restore_vm(self.instance_name)
         self.servers_client.delete_server(self.instance['id'])
