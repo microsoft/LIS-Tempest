@@ -188,8 +188,6 @@ class RemoteClient(RemoteClientBase):
 
     def verify_deamon(self, deamon):
         cmd = 'ps cax | grep %s' % deamon
-        import pdb
-        pdb.set_trace()
         output = self.exec_command(cmd)
         return output
 
