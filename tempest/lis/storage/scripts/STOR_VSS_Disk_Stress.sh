@@ -20,62 +20,10 @@
 # permissions and limitations under the License.
 #
 ########################################################################
-
+. utils.sh
 echoerr() { echo "$@" 1>&2; }
 
-# Download iOzoneiozone3_430.tar
-iOzoneVers='3_430'
-curl http://www.iozone.org/src/current/iozone$iOzoneVers.tar > iozone$iOzoneVers.tar
-sts=$?
-if [ 0 -ne ${sts} ]; then
-    echoerr "iOzone v$iOzoneVers download: Failed"
-    exit 1
-else
-    echo "iOzone v$iOzoneVers download: Success"
-fi
-
-
-# Make sure the iozone exists
-IOZONE=iozone$iOzoneVers.tar
-if [ ! -e ${IOZONE} ];
-then
-    echoerr "Cannot find iozone file."
-    exit 1
-fi
-
-sudo yum groupinstall "Development Tools" -y
-
-# Get Root Directory of tarball
-tarballdir=`sudo tar -tvf ${IOZONE} | head -n 1 | awk -F " " '{print $6}' | awk -F "/" '{print $1}'`
-
-# Now Extract the Tar Ball.
-sudo tar -xvf ${IOZONE}
-sts=$?
-if [ 0 -ne ${sts} ]; then
-	echoerr "Failed to extract Iozone tarball"
-	exit 1
-fi
-
-
-# cd in to directory
-if [ !  ${tarballdir} ];
-then
-    echoerr "Cannot find tarballdir."
-    exit 1
-fi
-
-cd ${tarballdir}/src/current
-
-# Compile iOzone
-sudo make linux
-sts=$?
-if [ 0 -ne ${sts} ]; then
-    echoerr "make linux : Failed"
-    exit 1
-else
-    echo "make linux : Sucsess"
-
-fi
+installIozone
 
 # Run Iozone
 while true ; do ./iozone -ag 10G   ; done > /dev/null 2>&1 &
