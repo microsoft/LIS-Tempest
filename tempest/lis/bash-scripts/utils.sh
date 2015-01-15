@@ -16,7 +16,7 @@
 
 declare os_VENDOR os_RELEASE os_UPDATE os_PACKAGE os_CODENAME
 maxdelay=5.0 # max offset in seconds.
-
+echoerr() { echo "$@" 1>&2; }
 # GetOSVersion
 function GetOSVersion {
 
@@ -217,6 +217,84 @@ function installIozone {
     else
         echo "make linux : Sucsess"
 
+    fi
+
+}
+
+function installReiserfs {
+
+    if is_fedora ; then
+        sudo rpm --import https://www.elrepo.org/RPM-GPG-KEY-elrepo.org
+        if [[ "$os_RELEASE" =~ "7" ]]; then
+            sudo rpm -Uvh http://www.elrepo.org/elrepo-release-7.0-2.el7.elrepo.noarch.rpm
+            sudo yum update
+            sudo yum install -y reiserfs-utils
+        elif [[ "$os_RELEASE" =~ "6" ]]; then
+            sudo rpm -Uvh http://www.elrepo.org/elrepo-release-6-6.el6.elrepo.noarch.rpm
+            sudo yum update
+            sudo yum install -y kmod-reiserfs reiserfs-utils
+        elif [[ "$os_RELEASE" =~ "5" ]]; then
+            sudo rpm -Uvh http://www.elrepo.org/elrepo-release-5-5.el5.elrepo.noarch.rpm
+            sudo yum update
+            sudo yum install -y kmod-reiserfs reiserfs-utils
+        fi
+        if [[ $? -ne 0 ]] ; then
+            echoerr "ERROR: Unable to install reiserfs. Aborting"
+            exit 10
+        fi
+    # ubuntu, debian
+    elif is_ubuntu ; then
+        echo "BUBU: $os_VENDOR $os_RELEASE $os_CODENAME"
+        sudo apt-get update
+        sudo apt-get install reiserfsprogs -y
+        if [[ $? -ne 0 ]] ; then
+            echoerr "ERROR: Unable to install reiserfs. Aborting"
+            exit 10
+        fi
+    elif is_suse ; then
+        echo y | sudo zypper install reiserfs
+        if [[ $? -ne 0 ]] ; then
+            echoerr "ERROR: Unable to install reiserfs. Aborting"
+            exit 10
+        fi
+    # other distro's
+    else
+        echoerr "Distro not suported. Aborting"
+        exit 10
+    fi
+
+}
+
+function installBtrfs {
+
+    if is_fedora ; then
+
+        sudo yum install -y btrfs-progs
+        if [[ $? -ne 0 ]] ; then
+            echoerr "ERROR: Unable to install btrfs. Aborting"
+            exit 10
+        fi
+
+    elif is_ubuntu ; then
+        echo "BUBU: $os_VENDOR $os_RELEASE $os_CODENAME"
+        sudo apt-get update
+        sudo apt-get install btrfs-tools -y
+        if [[ $? -ne 0 ]] ; then
+            echoerr "ERROR: Unable to install btrfs. Aborting"
+            exit 10
+        fi
+
+    elif is_suse ; then
+        echoerr "Not yet supported"
+        exit 10
+        echo y | sudo zypper install btrfs
+        if [[ $? -ne 0 ]] ; then
+            echoerr "ERROR: Unable to install btrfs. Aborting"
+            exit 10
+        fi
+    else
+        echoerr "Distro not suported. Aborting"
+        exit 10
     fi
 
 }
