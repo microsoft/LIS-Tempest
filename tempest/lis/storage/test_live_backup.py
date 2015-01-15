@@ -230,7 +230,7 @@ class VSS(manager.LisBase):
 
     @test.attr(type=['smoke', 'storage', 'live_backup'])
     @test.services('compute', 'network')
-    def test_vss_backup_restore(self):
+    def test_vss_backup_restore_base(self):
         self.spawn_vm()
         self._initiate_linux_client(self.floating_ip['ip'],
                                     self.ssh_user, self.keypair['private_key'])

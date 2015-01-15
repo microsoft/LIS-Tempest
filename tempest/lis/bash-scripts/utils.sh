@@ -151,7 +151,6 @@ function installIozone {
         fi
     # ubuntu, debian
     elif is_ubuntu ; then
-        echo "BUBU: $os_VENDOR $os_RELEASE $os_CODENAME"
         sudo apt-get update
         sudo apt-get install build-essential -y
         if [[ $? -ne 0 ]] ; then
@@ -244,7 +243,6 @@ function installReiserfs {
         fi
     # ubuntu, debian
     elif is_ubuntu ; then
-        echo "BUBU: $os_VENDOR $os_RELEASE $os_CODENAME"
         sudo apt-get update
         sudo apt-get install reiserfsprogs -y
         if [[ $? -ne 0 ]] ; then
@@ -276,7 +274,6 @@ function installBtrfs {
         fi
 
     elif is_ubuntu ; then
-        echo "BUBU: $os_VENDOR $os_RELEASE $os_CODENAME"
         sudo apt-get update
         sudo apt-get install btrfs-tools -y
         if [[ $? -ne 0 ]] ; then
@@ -290,6 +287,38 @@ function installBtrfs {
         echo y | sudo zypper install btrfs
         if [[ $? -ne 0 ]] ; then
             echoerr "ERROR: Unable to install btrfs. Aborting"
+            exit 10
+        fi
+    else
+        echoerr "Distro not suported. Aborting"
+        exit 10
+    fi
+
+}
+
+function installVfat {
+
+    if is_fedora ; then
+
+        sudo rpm -Uvh ftp://rpmfind.net/linux/sourceforge/a/an/anthonos/os2-repo/os2-repo/os2-qomo5/d/dosfstools-3.0.22-0.x86_64.rpm
+        if [[ $? -ne 0 ]] ; then
+            echoerr "ERROR: Unable to install dosfstools. Aborting"
+            exit 10
+        fi
+
+    elif is_ubuntu ; then
+        sudo apt-get install dosfstools
+        if [[ $? -ne 0 ]] ; then
+            echoerr "ERROR: Unable to install dosfstools. Aborting"
+            exit 10
+        fi
+
+    elif is_suse ; then
+        echoerr "Not yet supported"
+        exit 10
+        echo y | sudo zypper install dosfstools
+        if [[ $? -ne 0 ]] ; then
+            echoerr "ERROR: Unable to install dosfstools. Aborting"
             exit 10
         fi
     else

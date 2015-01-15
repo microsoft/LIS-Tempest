@@ -35,7 +35,11 @@ else
         sleep 3
     fi
 fi
-
+sudo man mkfs.vfat
+ if [ "$?" != "0" ]; then
+        . utils.sh
+        installVfat
+    fi
 # Format the floppy disk
 echo "mkfs -t vfat /dev/fd0"
 sudo mkfs -t vfat /dev/fd0
@@ -60,10 +64,10 @@ else
 fi
 
 echo "Perform read ,write and delete  operations on the Floppy Disk"
-cd /mnt/
+sudo cd /mnt/
 echo "Perform write operation on the floppy disk"
 echo "Creating a file Sample.txt"
-echo "This is a sample file been created for testing..." >Sample.txt
+sudo echo "This is a sample file been created for testing..." >Sample.txt
 sts=$?
 if [ 0 -ne ${sts} ]; then
 	echoerr "Unable to create a file on the Floppy Disk"
@@ -73,7 +77,7 @@ else
 fi
 
 echo "Perform read operation on the floppy disk"
-cat Sample.txt
+sudo cat Sample.txt
 sts=$?
        if [ 0 -ne ${sts} ]; then
 			echoerr "Unable to read Sample.txt file from the floppy disk"
@@ -84,7 +88,7 @@ sts=$?
 
 echo "Perform delete operation on the Floppy disk"
 
-rm Sample.txt
+sudo rm Sample.txt
 sts=$?
 
         if [ 0 -ne ${sts} ]; then
