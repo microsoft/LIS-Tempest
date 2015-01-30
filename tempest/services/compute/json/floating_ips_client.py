@@ -81,6 +81,20 @@ class FloatingIPsClientJSON(rest_client.RestClient):
         self.validate_response(schema.add_remove_floating_ip, resp, body)
         return resp, body
 
+    def associate_floating_ip_to_address(self, floating_ip, private_ip, server_id):
+        """Associate the provided floating IP to a specific address."""
+        url = "servers/%s/action" % str(server_id)
+        post_body = {
+            'addFloatingIp': {
+                'fixed_address': private_ip,
+                'address': floating_ip,
+            }
+        }
+
+        post_body = json.dumps(post_body)
+        resp, body = self.post(url, post_body)
+        self.validate_response(schema.add_remove_floating_ip, resp, body)
+        return resp, body
     def disassociate_floating_ip_from_server(self, floating_ip, server_id):
         """Disassociate the provided floating IP from a specific server."""
         url = "servers/%s/action" % str(server_id)

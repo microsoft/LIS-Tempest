@@ -139,8 +139,46 @@ class RemoteClient(RemoteClientBase):
         cmd = 'sudo sh -c "echo \\"%s\\" >/dev/console"' % message
         return self.exec_command(cmd)
 
-    def ping_host(self, host):
-        cmd = 'ping -c1 -w1 %s' % host
+    def set_ip(self, ip, netmask, interface):
+        cmd = 'sudo ip addr add %s/%s dev %s' % (ip, netmask, interface)
+        return self.exec_command(cmd)
+
+    def refresh_iface(self, interface):
+        cmd = ('sudo dhclient %(interface)s -r; '
+               'sudo dhclient %(interface)s ; '
+               'sudo ip link set %(interface)s down; '
+               'sudo ip link set %(interface)s up') % {'interface': interface}
+        return self.exec_command(cmd)
+
+    def set_legacy_adapter(self, ip, netmask, gateway):
+        cmd = ('adapter=$(for i in `sudo ls /proc/sys/net/ipv4/conf`; do '
+               ' if [ "$i" != "all" -a "$i" != "lo" -a "$i" != "eth0" -a "$i" != "default" ];then '
+               ' echo $i; '
+               'fi; done); '
+               ' sudo ip addr add %(ip)s/%(netmask)s dev $adapter; '
+               ' sudo route add default gw %(gateway)s $adapter '
+               ' sudo ping -I $adapter -c1 %(gateway)s') % {'ip': ip, 'netmask': netmask, 'gateway': gateway}
+        return self.exec_command(cmd)
+
+    def check_log(self, log_path, log_message):
+        cmd = (
+            'sudo tail %(log)s | grep "%(msg)s" | wc -l') % {'log': log_path, 'msg': log_message}
+        return int(self.exec_command(cmd))
+
+    def ping_host(self, host, iface='eth0'):
+        cmd = 'ping -I %s -c1 -w1 %s' % (iface, host)
+        return self.exec_command(cmd)
+
+    def check_mac_match(self, mac_address):
+        cmd = 'sudo /sbin/ifconfig | grep %s' % mac_address
+        return self.exec_command(cmd)
+
+    def set_promisc(self):
+        cmd = 'sudo ip link set dev eth0 promisc on'
+        return self.exec_command(cmd)
+
+    def check_promisc(self):
+        cmd = 'sudo cat /var/log/messages | grep "promisc" '
         return self.exec_command(cmd)
 
     def get_mac_address(self):
@@ -219,16 +257,16 @@ class RemoteClient(RemoteClientBase):
         return self.verify_deamon('hv_vss_daemon')
 
 
-class FedoraUtils(RemoteClient):
-
-    def get_os_type(self):
-        return 'fedora'
-
-
 class DebianUtils(RemoteClient):
 
     def get_os_type(self):
         return 'debian'
+
+
+class FedoraUtils(RemoteClient):
+
+    def get_os_type(self):
+        return 'fedora'
 
 
 class Fedora7Utils(RemoteClient):
@@ -237,9 +275,22 @@ class Fedora7Utils(RemoteClient):
         return 'fedora7'
 
     def verify_deamon(self, deamon_name):
-        cmd = 'systemctl list-units --type=service | grep %s ' % deamon_name
+        cmd = 'sudo systemctl restart %s' % deamon_name
         output = self.exec_command(cmd)
         return output
 
     def verify_vss_deamon(self):
         return self.verify_deamon('hypervvssd')
+
+
+class SuseUtils(RemoteClient):
+
+    def get_os_type(self):
+        return 'suse'
+
+    def refresh_iface(self, interface):
+        cmd = ('sudo dhcpcd %(interface)s -k; '
+               'sudo dhcpcd %(interface)s ; '
+               'sudo ip link set %(interface)s down; '
+               'sudo ip link set %(interface)s up') % {'interface': interface}
+        return self.exec_command(cmd)

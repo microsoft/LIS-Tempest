@@ -99,6 +99,7 @@ class ScenarioTest(tempest.test.BaseTestCase):
         # Neutron network client
         cls.network_client = cls.manager.network_client
         cls.flavor_client = cls.manager.flavors_client
+        cls.tenant_id = cls.manager.identity_client.tenant_id
 
     @classmethod
     def tearDownClass(cls):
@@ -223,7 +224,7 @@ class ScenarioTest(tempest.test.BaseTestCase):
             create_kwargs = {}
 
         fixed_network_name = CONF.compute.fixed_network_name
-        if 'nics' not in create_kwargs and fixed_network_name:
+        if 'networks' not in create_kwargs and fixed_network_name:
             _, networks = self.networks_client.list_networks()
             # If several networks found, set the NetID on which to connect the
             # server to avoid the following error "Multiple possible networks
@@ -232,7 +233,7 @@ class ScenarioTest(tempest.test.BaseTestCase):
             if len(networks) > 1:
                 for network in networks:
                     if network['label'] == fixed_network_name:
-                        create_kwargs['nics'] = [{'net-id': network['id']}]
+                        create_kwargs['networks'] = [{'uuid': network['id']}]
                         break
                 # If we didn't find the network we were looking for :
                 else:
@@ -1445,230 +1446,6 @@ class OfficialClientTest(tempest.test.BaseTestCase):
         LOG.debug("image:%s" % self.image)
 
 
-# power/provision states as of icehouse
-class BaremetalPowerStates(object):
-
-    """Possible power states of an Ironic node."""
-    POWER_ON = 'power on'
-    POWER_OFF = 'power off'
-    REBOOT = 'rebooting'
-    SUSPEND = 'suspended'
-
-
-class BaremetalProvisionStates(object):
-
-    """Possible provision states of an Ironic node."""
-    NOSTATE = None
-    INIT = 'initializing'
-    ACTIVE = 'active'
-    BUILDING = 'building'
-    DEPLOYWAIT = 'wait call-back'
-    DEPLOYING = 'deploying'
-    DEPLOYFAIL = 'deploy failed'
-    DEPLOYDONE = 'deploy complete'
-    DELETING = 'deleting'
-    DELETED = 'deleted'
-    ERROR = 'error'
-
-
-class BaremetalScenarioTest(OfficialClientTest):
-
-    @classmethod
-    def setUpClass(cls):
-        super(BaremetalScenarioTest, cls).setUpClass()
-
-        if (not CONF.service_available.ironic or
-                not CONF.baremetal.driver_enabled):
-            msg = 'Ironic not available or Ironic compute driver not enabled'
-            raise cls.skipException(msg)
-
-        # use an admin client manager for baremetal client
-        admin_creds = cls.admin_credentials()
-        manager = clients.OfficialClientManager(credentials=admin_creds)
-        cls.baremetal_client = manager.baremetal_client
-
-        # allow any issues obtaining the node list to raise early
-        cls.baremetal_client.node.list()
-
-    def _node_state_timeout(self, node_id, state_attr,
-                            target_states, timeout=10, interval=1):
-        if not isinstance(target_states, list):
-            target_states = [target_states]
-
-        def check_state():
-            node = self.get_node(node_id=node_id)
-            if getattr(node, state_attr) in target_states:
-                return True
-            return False
-
-        if not tempest.test.call_until_true(
-                check_state, timeout, interval):
-            msg = ("Timed out waiting for node %s to reach %s state(s) %s" %
-                   (node_id, state_attr, target_states))
-            raise exceptions.TimeoutException(msg)
-
-    def wait_provisioning_state(self, node_id, state, timeout):
-        self._node_state_timeout(
-            node_id=node_id, state_attr='provision_state',
-            target_states=state, timeout=timeout)
-
-    def wait_power_state(self, node_id, state):
-        self._node_state_timeout(
-            node_id=node_id, state_attr='power_state',
-            target_states=state, timeout=CONF.baremetal.power_timeout)
-
-    def wait_node(self, instance_id):
-        """Waits for a node to be associated with instance_id."""
-        from ironicclient import exc as ironic_exceptions
-
-        def _get_node():
-            node = None
-            try:
-                node = self.get_node(instance_id=instance_id)
-            except ironic_exceptions.HTTPNotFound:
-                pass
-            return node is not None
-
-        if not tempest.test.call_until_true(
-                _get_node, CONF.baremetal.association_timeout, 1):
-            msg = ('Timed out waiting to get Ironic node by instance id %s'
-                   % instance_id)
-            raise exceptions.TimeoutException(msg)
-
-    def get_node(self, node_id=None, instance_id=None):
-        if node_id:
-            return self.baremetal_client.node.get(node_id)
-        elif instance_id:
-            return self.baremetal_client.node.get_by_instance_uuid(instance_id)
-
-    def get_ports(self, node_id):
-        ports = []
-        for port in self.baremetal_client.node.list_ports(node_id):
-            ports.append(self.baremetal_client.port.get(port.uuid))
-        return ports
-
-    def add_keypair(self):
-        self.keypair = self.create_keypair()
-
-    def verify_connectivity(self, ip=None):
-        if ip:
-            dest = self.get_remote_client(ip)
-        else:
-            dest = self.get_remote_client(self.instance)
-        dest.validate_authentication()
-
-    def boot_instance(self):
-        create_kwargs = {
-            'key_name': self.keypair.id
-        }
-        self.instance = self.create_server(
-            wait_on_boot=False, create_kwargs=create_kwargs)
-
-        self.addCleanup_with_wait(self.compute_client.servers,
-                                  self.instance.id,
-                                  cleanup_callable=self.delete_wrapper,
-                                  cleanup_args=[self.instance])
-
-        self.wait_node(self.instance.id)
-        self.node = self.get_node(instance_id=self.instance.id)
-
-        self.wait_power_state(self.node.uuid, BaremetalPowerStates.POWER_ON)
-
-        self.wait_provisioning_state(
-            self.node.uuid,
-            [BaremetalProvisionStates.DEPLOYWAIT,
-             BaremetalProvisionStates.ACTIVE],
-            timeout=15)
-
-        self.wait_provisioning_state(self.node.uuid,
-                                     BaremetalProvisionStates.ACTIVE,
-                                     timeout=CONF.baremetal.active_timeout)
-
-        self.status_timeout(
-            self.compute_client.servers, self.instance.id, 'ACTIVE')
-
-        self.node = self.get_node(instance_id=self.instance.id)
-        self.instance = self.compute_client.servers.get(self.instance.id)
-
-    def terminate_instance(self):
-        self.instance.delete()
-        self.wait_power_state(self.node.uuid, BaremetalPowerStates.POWER_OFF)
-        self.wait_provisioning_state(
-            self.node.uuid,
-            BaremetalProvisionStates.NOSTATE,
-            timeout=CONF.baremetal.unprovision_timeout)
-
-
-class EncryptionScenarioTest(OfficialClientTest):
-
-    """
-    Base class for encryption scenario tests
-    """
-
-    @classmethod
-    def setUpClass(cls):
-        super(EncryptionScenarioTest, cls).setUpClass()
-
-        # use admin credentials to create encrypted volume types
-        admin_creds = cls.admin_credentials()
-        manager = clients.OfficialClientManager(credentials=admin_creds)
-        cls.admin_volume_client = manager.volume_client
-
-    def _wait_for_volume_status(self, status):
-        self.status_timeout(
-            self.volume_client.volumes, self.volume.id, status)
-
-    def nova_boot(self):
-        self.keypair = self.create_keypair()
-        create_kwargs = {'key_name': self.keypair.name}
-        self.server = self.create_server(self.compute_client,
-                                         image=self.image,
-                                         create_kwargs=create_kwargs)
-
-    def create_volume_type(self, client=None, name=None):
-        if not client:
-            client = self.admin_volume_client
-        if not name:
-            name = 'generic'
-        randomized_name = data_utils.rand_name('scenario-type-' + name + '-')
-        LOG.debug("Creating a volume type: %s", randomized_name)
-        volume_type = client.volume_types.create(randomized_name)
-        self.addCleanup(client.volume_types.delete, volume_type.id)
-        return volume_type
-
-    def create_encryption_type(self, client=None, type_id=None, provider=None,
-                               key_size=None, cipher=None,
-                               control_location=None):
-        if not client:
-            client = self.admin_volume_client
-        if not type_id:
-            volume_type = self.create_volume_type()
-            type_id = volume_type.id
-        LOG.debug("Creating an encryption type for volume type: %s", type_id)
-        client.volume_encryption_types.create(type_id,
-                                              {'provider': provider,
-                                               'key_size': key_size,
-                                               'cipher': cipher,
-                                               'control_location':
-                                               control_location})
-
-    def nova_volume_attach(self):
-        attach_volume_client = self.compute_client.volumes.create_server_volume
-        volume = attach_volume_client(self.server.id,
-                                      self.volume.id,
-                                      '/dev/vdb')
-        self.assertEqual(self.volume.id, volume.id)
-        self._wait_for_volume_status('in-use')
-
-    def nova_volume_detach(self):
-        detach_volume_client = self.compute_client.volumes.delete_server_volume
-        detach_volume_client(self.server.id, self.volume.id)
-        self._wait_for_volume_status('available')
-
-        volume = self.volume_client.volumes.get(self.volume.id)
-        self.assertEqual('available', volume.status)
-
-
 class NetworkScenarioTest(OfficialClientTest):
 
     """
@@ -2234,222 +2011,6 @@ class NetworkScenarioTest(OfficialClientTest):
         return network, subnet, router
 
 
-class OrchestrationScenarioTest(OfficialClientTest):
-
-    """
-    Base class for orchestration scenario tests
-    """
-
-    @classmethod
-    def setUpClass(cls):
-        super(OrchestrationScenarioTest, cls).setUpClass()
-        if not CONF.service_available.heat:
-            raise cls.skipException("Heat support is required")
-
-    @classmethod
-    def credentials(cls):
-        admin_creds = auth.get_default_credentials('identity_admin')
-        creds = auth.get_default_credentials('user')
-        admin_creds.tenant_name = creds.tenant_name
-        return admin_creds
-
-    def _load_template(self, base_file, file_name):
-        filepath = os.path.join(os.path.dirname(os.path.realpath(base_file)),
-                                file_name)
-        with open(filepath) as f:
-            return f.read()
-
-    @classmethod
-    def _stack_rand_name(cls):
-        return data_utils.rand_name(cls.__name__ + '-')
-
-    @classmethod
-    def _get_default_network(cls):
-        networks = cls.network_client.list_networks()
-        for net in networks['networks']:
-            if net['name'] == CONF.compute.fixed_network_name:
-                return net
-
-    @staticmethod
-    def _stack_output(stack, output_key):
-        """Return a stack output value for a given key."""
-        return next((o['output_value'] for o in stack.outputs
-                     if o['output_key'] == output_key), None)
-
-    def _ping_ip_address(self, ip_address, should_succeed=True):
-        cmd = ['ping', '-c1', '-w1', ip_address]
-
-        def ping():
-            proc = subprocess.Popen(cmd,
-                                    stdout=subprocess.PIPE,
-                                    stderr=subprocess.PIPE)
-            proc.wait()
-            return (proc.returncode == 0) == should_succeed
-
-        return tempest.test.call_until_true(
-            ping, CONF.orchestration.build_timeout, 1)
-
-    def _wait_for_resource_status(self, stack_identifier, resource_name,
-                                  status, failure_pattern='^.*_FAILED$'):
-        """Waits for a Resource to reach a given status."""
-        fail_regexp = re.compile(failure_pattern)
-        build_timeout = CONF.orchestration.build_timeout
-        build_interval = CONF.orchestration.build_interval
-
-        start = timeutils.utcnow()
-        while timeutils.delta_seconds(start,
-                                      timeutils.utcnow()) < build_timeout:
-            try:
-                res = self.client.resources.get(
-                    stack_identifier, resource_name)
-            except heat_exceptions.HTTPNotFound:
-                # ignore this, as the resource may not have
-                # been created yet
-                pass
-            else:
-                if res.resource_status == status:
-                    return
-                if fail_regexp.search(res.resource_status):
-                    raise exceptions.StackResourceBuildErrorException(
-                        resource_name=res.resource_name,
-                        stack_identifier=stack_identifier,
-                        resource_status=res.resource_status,
-                        resource_status_reason=res.resource_status_reason)
-            time.sleep(build_interval)
-
-        message = ('Resource %s failed to reach %s status within '
-                   'the required time (%s s).' %
-                   (res.resource_name, status, build_timeout))
-        raise exceptions.TimeoutException(message)
-
-    def _wait_for_stack_status(self, stack_identifier, status,
-                               failure_pattern='^.*_FAILED$'):
-        """
-        Waits for a Stack to reach a given status.
-
-        Note this compares the full $action_$status, e.g
-        CREATE_COMPLETE, not just COMPLETE which is exposed
-        via the status property of Stack in heatclient
-        """
-        fail_regexp = re.compile(failure_pattern)
-        build_timeout = CONF.orchestration.build_timeout
-        build_interval = CONF.orchestration.build_interval
-
-        start = timeutils.utcnow()
-        while timeutils.delta_seconds(start,
-                                      timeutils.utcnow()) < build_timeout:
-            try:
-                stack = self.client.stacks.get(stack_identifier)
-            except heat_exceptions.HTTPNotFound:
-                # ignore this, as the stackource may not have
-                # been created yet
-                pass
-            else:
-                if stack.stack_status == status:
-                    return
-                if fail_regexp.search(stack.stack_status):
-                    raise exceptions.StackBuildErrorException(
-                        stack_identifier=stack_identifier,
-                        stack_status=stack.stack_status,
-                        stack_status_reason=stack.stack_status_reason)
-            time.sleep(build_interval)
-
-        message = ('Stack %s failed to reach %s status within '
-                   'the required time (%s s).' %
-                   (stack.stack_name, status, build_timeout))
-        raise exceptions.TimeoutException(message)
-
-    def _stack_delete(self, stack_identifier):
-        try:
-            self.client.stacks.delete(stack_identifier)
-        except heat_exceptions.HTTPNotFound:
-            pass
-
-
-class SwiftScenarioTest(ScenarioTest):
-
-    """
-    Provide harness to do Swift scenario tests.
-
-    Subclasses implement the tests that use the methods provided by this
-    class.
-    """
-
-    @classmethod
-    def setUpClass(cls):
-        cls.set_network_resources()
-        super(SwiftScenarioTest, cls).setUpClass()
-        if not CONF.service_available.swift:
-            skip_msg = ("%s skipped as swift is not available" %
-                        cls.__name__)
-            raise cls.skipException(skip_msg)
-        # Clients for Swift
-        cls.account_client = cls.manager.account_client
-        cls.container_client = cls.manager.container_client
-        cls.object_client = cls.manager.object_client
-
-    def _get_swift_stat(self):
-        """get swift status for our user account."""
-        self.account_client.list_account_containers()
-        LOG.debug('Swift status information obtained successfully')
-
-    def _create_container(self, container_name=None):
-        name = container_name or data_utils.rand_name(
-            'swift-scenario-container')
-        self.container_client.create_container(name)
-        # look for the container to assure it is created
-        self._list_and_check_container_objects(name)
-        LOG.debug('Container %s created' % (name))
-        return name
-
-    def _delete_container(self, container_name):
-        self.container_client.delete_container(container_name)
-        LOG.debug('Container %s deleted' % (container_name))
-
-    def _upload_object_to_container(self, container_name, obj_name=None):
-        obj_name = obj_name or data_utils.rand_name('swift-scenario-object')
-        obj_data = data_utils.arbitrary_string()
-        self.object_client.create_object(container_name, obj_name, obj_data)
-        return obj_name, obj_data
-
-    def _delete_object(self, container_name, filename):
-        self.object_client.delete_object(container_name, filename)
-        self._list_and_check_container_objects(container_name,
-                                               not_present_obj=[filename])
-
-    def _list_and_check_container_objects(self, container_name,
-                                          present_obj=None,
-                                          not_present_obj=None):
-        """
-        List objects for a given container and assert which are present and
-        which are not.
-        """
-        if present_obj is None:
-            present_obj = []
-        if not_present_obj is None:
-            not_present_obj = []
-        _, object_list = self.container_client.list_container_contents(
-            container_name)
-        if present_obj:
-            for obj in present_obj:
-                self.assertIn(obj, object_list)
-        if not_present_obj:
-            for obj in not_present_obj:
-                self.assertNotIn(obj, object_list)
-
-    def _change_container_acl(self, container_name, acl):
-        metadata_param = {'metadata_prefix': 'x-container-',
-                          'metadata': {'read': acl}}
-        self.container_client.update_container_metadata(container_name,
-                                                        **metadata_param)
-        resp, _ = self.container_client.list_container_metadata(container_name)
-        self.assertEqual(resp['x-container-read'], acl)
-
-    def _download_and_verify(self, container_name, obj_name, expected_data):
-        _, obj = self.object_client.get_object(container_name, obj_name)
-        self.assertEqual(obj, expected_data)
-
-
 class LisBase(ScenarioTest):
 
     def setUp(self):
@@ -2824,6 +2385,28 @@ class LisBase(ScenarioTest):
         self.linux_client.execute_script(
             script_name, cmd_params, full_script_path, destination)
 
+    def check_operstate(self, l_client):
+        script_name = 'NET_Check_Operstate.sh'
+        script_path = '/core/scripts/' + script_name
+        destination = '/tmp/'
+        my_path = os.path.abspath(
+            os.path.normpath(os.path.dirname(__file__)))
+        full_script_path = my_path + script_path
+        cmd_params = []
+        l_client.execute_script(
+            script_name, cmd_params, full_script_path, destination)
+
+    def copy_over(self, linux_client, user, ip_destination):
+        script_name = 'NET_copy_large.sh'
+        script_path = '/core/scripts/' + script_name
+        destination = '/tmp/'
+        my_path = os.path.abspath(
+            os.path.normpath(os.path.dirname(__file__)))
+        full_script_path = my_path + script_path
+        cmd_params = [self.keypair['name'], user, ip_destination]
+        linux_client.execute_script(
+            script_name, cmd_params, full_script_path, destination)
+
     def get_vm_time(self):
         unix_time = self.linux_client.get_unix_time()
         LOG.debug('VM unix time %s ', unix_time)
@@ -2867,3 +2450,169 @@ class LisBase(ScenarioTest):
         LOG.debug("Created snapshot image %s for server %s",
                   image_name, self.server_id)
         return snapshot_image
+
+    def _list_networks(self, *args, **kwargs):
+        """List networks using admin creds """
+        return self._admin_lister('networks')(*args, **kwargs)
+
+    def _list_subnets(self, *args, **kwargs):
+        """List subnets using admin creds """
+        return self._admin_lister('subnets')(*args, **kwargs)
+
+    def _list_routers(self, *args, **kwargs):
+        """List routers using admin creds """
+        return self._admin_lister('routers')(*args, **kwargs)
+
+    def _list_ports(self, *args, **kwargs):
+        """List ports using admin creds """
+        return self._admin_lister('ports')(*args, **kwargs)
+
+    def _admin_lister(self, resource_type):
+        def temp(*args, **kwargs):
+            temp_method = self.admin_manager.network_client.__getattr__(
+                'list_%s' % resource_type)
+            _, resource_list = temp_method(*args, **kwargs)
+            return resource_list[resource_type]
+        return temp
+
+    def _create_network(self, tenant_id, namestart='network-smoke-', phys_net_type=None):
+        name = data_utils.rand_name(namestart)
+        kwargs = {'name': name, 'tenant_id': tenant_id}
+        if phys_net_type:
+            kwargs['provider:network_type'] = 'flat'
+            kwargs['provider:physical_network'] = phys_net_type
+        _, result = self.network_client.create_network(**kwargs)
+        network = net_resources.DeletableNetwork(client=self.network_client,
+                                                 **result['network'])
+        self.assertEqual(network.name, name)
+        self.addCleanup(self.delete_wrapper, network.delete)
+        return network
+
+    def _create_subnet(self, network, namestart='subnet-smoke-', **kwargs):
+        """
+        Create a subnet for the given network within the cidr block
+        configured for tenant networks.
+        """
+
+        def cidr_in_use(cidr, tenant_id):
+            """
+            :return True if subnet with cidr already exist in tenant
+                False else
+            """
+            cidr_in_use = self._list_subnets(tenant_id=tenant_id, cidr=cidr)
+            return len(cidr_in_use) != 0
+
+        tenant_cidr = netaddr.IPNetwork(CONF.network.tenant_network_cidr)
+        result = None
+        # Repeatedly attempt subnet creation with sequential cidr
+        # blocks until an unallocated block is found.
+        for subnet_cidr in tenant_cidr.subnet(
+                CONF.network.tenant_network_mask_bits):
+            str_cidr = str(subnet_cidr)
+            if cidr_in_use(str_cidr, tenant_id=network.tenant_id):
+                continue
+
+            subnet = dict(
+                name=data_utils.rand_name(namestart),
+                ip_version=4,
+                network_id=network.id,
+                tenant_id=network.tenant_id,
+                cidr=str_cidr,
+                **kwargs
+            )
+            try:
+                _, result = self.network_client.create_subnet(**subnet)
+                break
+            except exc.NeutronClientException as e:
+                is_overlapping_cidr = 'overlaps with another subnet' in str(e)
+                if not is_overlapping_cidr:
+                    raise
+        self.assertIsNotNone(result, 'Unable to allocate tenant network')
+        subnet = net_resources.DeletableSubnet(client=self.network_client,
+                                               **result['subnet'])
+        self.assertEqual(subnet.cidr, str_cidr)
+        self.addCleanup(self.delete_wrapper, subnet.delete)
+        return subnet
+
+    def _get_router(self, tenant_id):
+        """Retrieve a router for the given tenant id.
+
+        If a public router has been configured, it will be returned.
+
+        If a public router has not been configured, but a public
+        network has, a tenant router will be created and returned that
+        routes traffic to the public network.
+        """
+        router_id = CONF.network.public_router_id
+        network_id = CONF.network.public_network_id
+        if router_id:
+            result = self.network_client.show_router(router_id)
+            return net_resources.AttributeDict(**result['router'])
+        elif network_id:
+            router = self._create_router(tenant_id)
+            router.set_gateway(network_id)
+            return router
+        else:
+            raise Exception("Neither of 'public_router_id' or "
+                            "'public_network_id' has been defined.")
+
+    def _create_router(self, tenant_id, namestart='router-smoke-'):
+        name = data_utils.rand_name(namestart)
+        _, result = self.network_client.create_router(name=name,
+                                                      admin_state_up=True,
+                                                      tenant_id=tenant_id, )
+        router = net_resources.DeletableRouter(client=self.network_client,
+                                               **result['router'])
+        self.assertEqual(router.name, name)
+        self.addCleanup(self.delete_wrapper, router.delete)
+        return router
+
+    def create_networks(self, tenant_id=None, phys_net_type=None):
+        """Create a network with a subnet connected to a router.
+
+        :returns: network, subnet, router
+        """
+
+        if tenant_id is None:
+            tenant_id = self.tenant_id
+        network = self._create_network(tenant_id=tenant_id, phys_net_type=phys_net_type)
+        router = self._get_router(tenant_id)
+        subnet = self._create_subnet(network)
+        subnet.add_to_router(router.id)
+        return network, subnet, router
+
+    def _create_port(self, network, namestart='port-list'):
+        name = data_utils.rand_name(namestart)
+        _, result = self.network_client.create_port(
+            name=name,
+            network_id=network['id'],
+            tenant_id=self.tenant_id)
+        self.assertIsNotNone(result, 'Unable to allocate port')
+        port = net_resources.DeletablePort(client=self.network_client,
+                                           **result['port'])
+        self.addCleanup(self.delete_wrapper, port.delete)
+        return port
+
+    def add_legacy_nic(self, instance_name, host_name):
+        """Attach Disk to VM"""
+
+        script_location = "%s%s" % (self.script_folder,
+                                    'setupscripts\\add_legacy_nic.ps1')
+        self.host_client.run_powershell_cmd(
+            script_location,
+            vmName=instance_name,
+            hvServer=host_name)
+
+    def add_empty_nic(self, instance_name, host_name):
+        """Attach Disk to VM"""
+
+        script_location = "%s%s" % (self.script_folder,
+                                    'setupscripts\\add_empty_nic.ps1')
+        self.host_client.run_powershell_cmd(
+            script_location,
+            vmName=instance_name,
+            hvServer=host_name)
+
+    def get_subnet(self, subnet_id):
+        _, subnet = self.network_client.show_subnet(subnet_id)
+        return subnet['subnet']
