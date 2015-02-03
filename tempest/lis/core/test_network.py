@@ -122,8 +122,7 @@ class Network(manager.LisBase):
         security_groups = [self.security_group]
         create_kwargs = {
             'key_name': self.keypair['name'],
-            'security_groups': security_groups,
-            'availability_zone': 'nova:%s' % 'OBIWAN'
+            'security_groups': security_groups
         }
 
         create_kwargs['networks'] = [{'uuid': self.get_default_network_id()}]
