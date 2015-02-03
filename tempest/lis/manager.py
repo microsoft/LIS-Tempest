@@ -2396,14 +2396,14 @@ class LisBase(ScenarioTest):
         l_client.execute_script(
             script_name, cmd_params, full_script_path, destination)
 
-    def copy_over(self, linux_client, user, ip_destination):
+    def copy_large_file(self, linux_client, keypair_name, user, ip_destination):
         script_name = 'NET_copy_large.sh'
         script_path = '/core/scripts/' + script_name
         destination = '/tmp/'
         my_path = os.path.abspath(
             os.path.normpath(os.path.dirname(__file__)))
         full_script_path = my_path + script_path
-        cmd_params = [self.keypair['name'], user, ip_destination]
+        cmd_params = [keypair_name, user, ip_destination]
         linux_client.execute_script(
             script_name, cmd_params, full_script_path, destination)
 
@@ -2488,7 +2488,7 @@ class LisBase(ScenarioTest):
         self.addCleanup(self.delete_wrapper, network.delete)
         return network
 
-    def _create_subnet(self, network, namestart='subnet-smoke-', **kwargs):
+    def _create_subnet(self, network, existing_cidr=None, namestart='subnet-smoke-', **kwargs):
         """
         Create a subnet for the given network within the cidr block
         configured for tenant networks.
@@ -2512,14 +2512,24 @@ class LisBase(ScenarioTest):
             if cidr_in_use(str_cidr, tenant_id=network.tenant_id):
                 continue
 
-            subnet = dict(
-                name=data_utils.rand_name(namestart),
-                ip_version=4,
-                network_id=network.id,
-                tenant_id=network.tenant_id,
-                cidr=str_cidr,
-                **kwargs
-            )
+            if existing_cidr:
+                subnet = dict(
+                    name=data_utils.rand_name(namestart),
+                    ip_version=4,
+                    network_id=network.id,
+                    tenant_id=network.tenant_id,
+                    cidr=existing_cidr,
+                    **kwargs
+                )
+            else:
+                subnet = dict(
+                    name=data_utils.rand_name(namestart),
+                    ip_version=4,
+                    network_id=network.id,
+                    tenant_id=network.tenant_id,
+                    cidr=str_cidr,
+                    **kwargs
+                )
             try:
                 _, result = self.network_client.create_subnet(**subnet)
                 break
@@ -2530,9 +2540,17 @@ class LisBase(ScenarioTest):
         self.assertIsNotNone(result, 'Unable to allocate tenant network')
         subnet = net_resources.DeletableSubnet(client=self.network_client,
                                                **result['subnet'])
-        self.assertEqual(subnet.cidr, str_cidr)
+        if existing_cidr:
+            self.assertEqual(subnet.cidr, existing_cidr)
+        else:
+            self.assertEqual(subnet.cidr, str_cidr)
+
         self.addCleanup(self.delete_wrapper, subnet.delete)
         return subnet
+
+    def get_subnet(self, subnet_id):
+        _, subnet = self.network_client.show_subnet(subnet_id)
+        return subnet['subnet']
 
     def _get_router(self, tenant_id):
         """Retrieve a router for the given tenant id.
@@ -2567,7 +2585,7 @@ class LisBase(ScenarioTest):
         self.addCleanup(self.delete_wrapper, router.delete)
         return router
 
-    def create_networks(self, tenant_id=None, phys_net_type=None):
+    def create_networks(self, tenant_id=None, phys_net_type=None, existing_cidr=None):
         """Create a network with a subnet connected to a router.
 
         :returns: network, subnet, router
@@ -2577,7 +2595,7 @@ class LisBase(ScenarioTest):
             tenant_id = self.tenant_id
         network = self._create_network(tenant_id=tenant_id, phys_net_type=phys_net_type)
         router = self._get_router(tenant_id)
-        subnet = self._create_subnet(network)
+        subnet = self._create_subnet(network, existing_cidr)
         subnet.add_to_router(router.id)
         return network, subnet, router
 
@@ -2613,6 +2631,22 @@ class LisBase(ScenarioTest):
             vmName=instance_name,
             hvServer=host_name)
 
-    def get_subnet(self, subnet_id):
-        _, subnet = self.network_client.show_subnet(subnet_id)
-        return subnet['subnet']
+
+    def set_mac_spoofing(self, vm):
+        self.host_client.run_powershell_cmd(
+            'Set-VMNetworkAdapter',
+            ComputerName=vm['host_name'],
+            VMName=vm['instance_name'],
+            MacAddressSpoofing='on')
+
+    def _set_bridge(self, linux_client, *args):
+        script_name = 'NET_SetBridge.sh'
+        script_path = '/core/scripts/' + script_name
+        destination = '/tmp/'
+        my_path = os.path.abspath(
+            os.path.normpath(os.path.dirname(__file__)))
+        full_script_path = my_path + script_path
+        import pdb
+        pdb.set_trace()
+        linux_client.execute_script(
+            script_name, args, full_script_path, destination)

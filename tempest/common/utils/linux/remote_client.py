@@ -150,6 +150,17 @@ class RemoteClient(RemoteClientBase):
                'sudo ip link set %(interface)s up') % {'interface': interface}
         return self.exec_command(cmd)
 
+    def get_dev_by_mac(self, mac):
+        # output like /sys/class/net/eth0/address:fa:16:3e:19:39:9e
+        # split_by_slash
+        cmd = ('device_full_path=$(sudo find /sys/class/net/*/ -name address | xargs grep "%s" );'
+               'elements=(${device_full_path//// }) ; '
+               ' echo ${elements[3]}') % mac
+
+        import pdb
+        pdb.set_trace()
+        return self.exec_command(cmd).strip()
+
     def set_legacy_adapter(self, ip, netmask, gateway):
         cmd = ('adapter=$(for i in `sudo ls /proc/sys/net/ipv4/conf`; do '
                ' if [ "$i" != "all" -a "$i" != "lo" -a "$i" != "eth0" -a "$i" != "default" ];then '

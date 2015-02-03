@@ -327,3 +327,39 @@ function installVfat {
     fi
 
 }
+function installBridgeUtils {
+
+    if is_fedora ; then
+
+        sudo yum install -y bridge-utils
+        if [[ $? -ne 0 ]] ; then
+            echoerr "ERROR: Unable to install bridge-utils. Aborting"
+            exit 10
+        fi
+
+    elif is_ubuntu ; then
+        sudo apt-get update
+        sudo apt-get install bridge-utils -y
+        if [[ $? -ne 0 ]] ; then
+            echoerr "ERROR: Unable to install bridge-utils. Aborting"
+            exit 10
+        fi
+
+    elif is_suse ; then
+        echoerr "Not yet supported"
+        exit 10
+        echo y | sudo zypper install bridge-utils
+        if [[ $? -ne 0 ]] ; then
+            echoerr "ERROR: Unable to install bridge-utils. Aborting"
+            exit 10
+        fi
+    else
+        echoerr "Distro not suported. Aborting"
+        exit 10
+    fi
+
+}
+
+function getEthNameByMAC {
+
+}

@@ -46,16 +46,26 @@ class Network(manager.LisBase):
                     image=self.image_ref, flavor=self.flavor_ref
                 )
             )
-        self.host_name = ""
-        self.instance_name = ""
         self.instances = []
         self.run_ssh = CONF.compute.run_ssh and \
             self.image_utils.is_sshable_image(self.image_ref)
         self.ssh_user = CONF.compute.ssh_user
-        LOG.debug('Starting test for i:{image}, f:{flavor}. '
+        LOG.debug('Starting test for image:{image}, flavor:{flavor}. '
                   'Run ssh: {ssh}, user: {ssh_user}'.format(
                       image=self.image_ref, flavor=self.flavor_ref,
                       ssh=self.run_ssh, ssh_user=self.ssh_user))
+        self.user_data_base = {
+            'ssh': ('#!/bin/sh  \n '
+                    'echo "%(content)s" > /home/%(home)s/.ssh/%(name)s;'
+                    'chmod 600 /home/%(home)s/.ssh/%(name)s;'
+                    'chown %(home)s /home/%(home)s/.ssh/%(name)s;'),
+            'big_file': ('#!/bin/sh  \n '
+                         'echo "%(content)s" > /home/%(home)s/.ssh/%(name)s;'
+                         'chmod 600 /home/%(home)s/.ssh/%(name)s;'
+                         'chown %(home)s /home/%(home)s/.ssh/%(name)s;'
+                         'dd if=/dev/urandom of=/tmp/large_file '
+                         'bs=1G count=%(gb_count)i;')
+        }
 
     def add_keypair(self):
         self.keypair = self.create_keypair()
@@ -104,19 +114,16 @@ class Network(manager.LisBase):
                         floating_ip['id'])
         return floating_ip
 
-    def nova_floating_ip_add(self, floating_ip, instance, fixed_address=None):
-        if fixed_address:
-            self.floating_ips_client.associate_floating_ip_to_address(
-                floating_ip['ip'], fixed_address, instance['id'])
-        else:
-            self.floating_ips_client.associate_floating_ip_to_server(
-                floating_ip['ip'], instance['id'])
+    def nova_floating_ip_add(self, floating_ip, instance):
+        self.floating_ips_client.associate_floating_ip_to_server(
+            floating_ip['ip'], instance['id'])
 
     def get_default_kwargs(self, user_data=None, networks=None):
         security_groups = [self.security_group]
         create_kwargs = {
             'key_name': self.keypair['name'],
-            'security_groups': security_groups
+            'security_groups': security_groups,
+            'availability_zone': 'nova:%s' % 'OBIWAN'
         }
 
         create_kwargs['networks'] = [{'uuid': self.get_default_network_id()}]
@@ -124,45 +131,50 @@ class Network(manager.LisBase):
             for net_id in networks:
                 create_kwargs['networks'].append({'uuid': net_id})
         if user_data:
-            user_data_message = self._get_userdata(user_data)
-
-            create_kwargs['user_data'] = base64.encodestring(user_data_message)
+            encrypted_user_data = self._get_userdata(user_data)
+            create_kwargs['user_data'] = encrypted_user_data
         return create_kwargs
 
     def _get_userdata(self, user_data):
-        if user_data == 'ssh':
-            msg = ('#!/bin/sh  \n '
-                   'echo "%(content)s" > /home/%(home)s/.ssh/%(name)s;'
-                   'chmod 600 /home/%(home)s/.ssh/%(name)s;'
-                   'chown %(home)s /home/%(home)s/.ssh/%(name)s;')
-
-        if user_data == 'big_file':
-            msg = ('#!/bin/sh  \n '
-                   'echo "%(content)s" > /home/%(home)s/.ssh/%(name)s;'
-                   'chmod 600 /home/%(home)s/.ssh/%(name)s;'
-                   'chown %(home)s /home/%(home)s/.ssh/%(name)s;'
-                   'dd if=/dev/urandom of=/tmp/large_file bs=1G count=2;')
-
+        key = self.keypair['private_key']
+        msg = self.user_data_base[user_data]
         user_data_message = msg % {'home': self.ssh_user,
-                                   'content': self.keypair['private_key'],
-                                   'name': self.keypair['name']}
-        return user_data_message
+                                   'content': key,
+                                   'name': self.keypair['name'],
+                                   'gb_count': 2}
+        return base64.encodestring(user_data_message)
 
-    def spawn_vm(self, create_kwargs=None):
+    def _spawn_vm(self, create_kwargs):
         fixed_network_name = CONF.compute.fixed_network_name
-        self.add_keypair()
-        self.security_group = self._create_security_group()
-        if not create_kwargs:
-            create_kwargs = self.get_default_kwargs()
         instance = self.boot_instance(create_kwargs)
-        instance['instance_name'] = instance["OS-EXT-SRV-ATTR:instance_name"]
-        instance['host_name'] = instance["OS-EXT-SRV-ATTR:hypervisor_hostname"]
-        instance['static_mac'] = instance['addresses'][
-            fixed_network_name][0]['OS-EXT-IPS-MAC:mac_addr']
+        instance['instance_name'] = instance[
+            "OS-EXT-SRV-ATTR:instance_name"]
+        instance['host_name'] = instance[
+            "OS-EXT-SRV-ATTR:hypervisor_hostname"]
         floating_ip = self.nova_floating_ip_create()
         self.nova_floating_ip_add(floating_ip, instance)
-        instance['floating_ip'] = floating_ip
-        self.instances.append(instance)
+        instance['floating_ip'] = floating_ip['ip']
+        return instance
+
+    def spawn_vm_basic(self, mac=False):
+        self.add_keypair()
+        self.security_group = self._create_security_group()
+        create_kwargs = self.get_default_kwargs()
+        instance = self._spawn_vm(create_kwargs)
+        if mac:
+            instance['static_mac'] = instance['addresses'][
+                fixed_network_name][0]['OS-EXT-IPS-MAC:mac_addr']
+        return instance
+
+    def spawn_vm_multi_nic(self):
+        self.add_keypair()
+        self.security_group = self._create_security_group()
+        network, snet, router = self.create_networks()
+        create_kwargs = self.get_default_kwargs(
+            user_data=False, networks=[network['id']])
+        instance = self._spawn_vm(create_kwargs)
+        instance['snet_gateway_ip'] = snet['gateway_ip']
+        return instance
 
     def spawn_vm_private(self):
         self.add_keypair()
@@ -172,43 +184,30 @@ class Network(manager.LisBase):
         create_kwargs = self.get_default_kwargs(
             user_data=True, networks=[network['id']])
         for _ in xrange(2):
-            instance = self.boot_instance(create_kwargs)
-            instance['instance_name'] = instance[
-                "OS-EXT-SRV-ATTR:instance_name"]
-            instance['host_name'] = instance[
-                "OS-EXT-SRV-ATTR:hypervisor_hostname"]
-            floating_ip = self.nova_floating_ip_create()
-            self.nova_floating_ip_add(floating_ip, instance)
-            instance['floating_ip'] = floating_ip
-            instance['private_ip'] = instance[
-                'addresses'][network['name']][0]['addr']
+            instance = self._spawn_vm(create_kwargs)
+            netw = instance['addresses'][network['name']][0]
+            instance['private_ip'] = netw['addr']
+            instance['private_mac'] = netw['OS-EXT-IPS-MAC:mac_addr']
             instance['private_ip_netmask'] = snet['cidr'].split('/')[1]
             self.instances.append(instance)
 
-    def _spawn_vm(self, create_kwargs):
-        instance = self.boot_instance(create_kwargs)
-        instance['instance_name'] = instance[
-            "OS-EXT-SRV-ATTR:instance_name"]
-        instance['host_name'] = instance[
-            "OS-EXT-SRV-ATTR:hypervisor_hostname"]
-        floating_ip = self.nova_floating_ip_create()
-        self.nova_floating_ip_add(floating_ip, instance)
-        instance['floating_ip'] = floating_ip
-        return instance
-
     def spawn_vm_bridge(self):
-        # get_keys = {'private_ip': "addresses[%s['name']][0]['addr']"} % network
         self.add_keypair()
         self.security_group = self._create_security_group()
         pr1 = data_utils.rand_name('physnet_private_1_')
         pr2 = data_utils.rand_name('physnet_private_2_')
         pr_net_1, pr_snet_1, r = self.create_networks(phys_net_type=pr1)
-        pr_net_2, pr_snet_2, r = self.create_networks(phys_net_type=pr2)
+        pr_net_2, pr_snet_2, r = self.create_networks(
+            phys_net_type=pr2, existing_cidr=pr_snet_1['cidr'])
+        self.bridge_network = pr_net_1
+
         create_kwargs = self.get_default_kwargs(
             user_data=False, networks=[pr_net_1['id']])
         instance = self._spawn_vm(create_kwargs)
         instance['private_ip'] = instance[
             'addresses'][pr_net_1['name']][0]['addr']
+        instance['private_mac'] = instance['addresses'][
+            pr_net_1['name']][0]['OS-EXT-IPS-MAC:mac_addr']
         instance['private_ip_netmask'] = pr_snet_1['cidr'].split('/')[1]
         self.instances.append(instance)
 
@@ -217,10 +216,12 @@ class Network(manager.LisBase):
         instance = self._spawn_vm(create_kwargs)
         instance['private_ip_1'] = instance[
             'addresses'][pr_net_1['name']][0]['addr']
-        instance['private_ip_netmask_1'] = pr_snet_1['cidr'].split('/')[1]
+        instance['private_mac_1'] = instance['addresses'][
+            pr_net_1['name']][0]['OS-EXT-IPS-MAC:mac_addr']
         instance['private_ip_2'] = instance[
             'addresses'][pr_net_2['name']][0]['addr']
-        instance['private_ip_netmask_2'] = pr_snet_2['cidr'].split('/')[1]
+        instance['private_mac_2'] = instance['addresses'][
+            pr_net_2['name']][0]['OS-EXT-IPS-MAC:mac_addr']
         self.instances.append(instance)
 
         create_kwargs = self.get_default_kwargs(
@@ -228,56 +229,25 @@ class Network(manager.LisBase):
         instance = self._spawn_vm(create_kwargs)
         instance['private_ip'] = instance[
             'addresses'][pr_net_2['name']][0]['addr']
-        instance['private_ip_netmask'] = pr_snet_2['cidr'].split('/')[1]
+        instance['private_mac'] = instance['addresses'][
+            pr_net_2['name']][0]['OS-EXT-IPS-MAC:mac_addr']
         self.instances.append(instance)
 
-    def spawn_double_vm(self, user_datas=None):
-        if user_datas:
-            vm1_user_data, vm2_user_data = user_datas
+    def spawn_copy_large_vm(self, user_datas):
+        vm1_user_data, vm2_user_data = user_datas
         fixed_network_name = CONF.compute.fixed_network_name
         self.add_keypair()
         self.security_group = self._create_security_group()
-        for _ in xrange(2):
-            if _ == 0:
-                create_kwargs = self.get_default_kwargs(
-                    user_data=vm1_user_data)
-                instance = self.boot_instance(create_kwargs)
-            else:
-                create_kwargs = self.get_default_kwargs(
-                    user_data=vm2_user_data)
-                instance = self.boot_instance(create_kwargs)
 
-            instance['instance_name'] = instance[
-                "OS-EXT-SRV-ATTR:instance_name"]
-            instance['host_name'] = instance[
-                "OS-EXT-SRV-ATTR:hypervisor_hostname"]
-            floating_ip = self.nova_floating_ip_create()
-            self.nova_floating_ip_add(floating_ip, instance)
-            instance['floating_ip'] = floating_ip
-            instance['private_ip'] = instance[
-                'addresses'][fixed_network_name][0]['addr']
-            self.instances.append(instance)
-
-    def spawn_vm_multi_nic(self):
-        self.add_keypair()
-        self.security_group = self._create_security_group()
-        network, snet, router = self.create_networks()
-        create_kwargs = self.get_default_kwargs(
-            user_data=False, networks=[network['id']])
-        instance = self.boot_instance(create_kwargs)
-        instance['instance_name'] = instance["OS-EXT-SRV-ATTR:instance_name"]
-        instance['host_name'] = instance["OS-EXT-SRV-ATTR:hypervisor_hostname"]
-        floating_ip = self.nova_floating_ip_create()
-        self.nova_floating_ip_add(floating_ip, instance)
-        instance['floating_ip'] = floating_ip
-        instance['snet_gateway_ip'] = snet['gateway_ip']
+        create_kwargs = self.get_default_kwargs(vm1_user_data)
+        instance = self._spawn_vm(create_kwargs)
         self.instances.append(instance)
 
-    def set_ip(self, ip, netmask, interface, linux_client=None):
-        if linux_client:
-            linux_client.set_ip(ip, netmask, interface)
-        else:
-            self.linux_client.set_ip(ip, netmask, interface)
+        create_kwargs = self.get_default_kwargs(vm2_user_data)
+        instance = self._spawn_vm(create_kwargs)
+        instance['private_ip'] = instance[
+            'addresses'][fixed_network_name][0]['addr']
+        self.instances.append(instance)
 
     def verify_ping(self, destination, interface='eth0', linux_client=None):
         if linux_client:
@@ -285,32 +255,19 @@ class Network(manager.LisBase):
         else:
             self.linux_client.ping_host(destination)
 
-    def check_mac(self, expected_mac, linux_client=None):
-        if linux_client:
-            linux_client.check_mac_match(expected_mac)
-        else:
-            self.linux_client.check_mac_match(expected_mac)
+    def check_mac(self, linux_client, expected_mac):
+        linux_client.check_mac_match(expected_mac)
 
-    def check_nic_operstate(self, linux_client=None):
-        if linux_client:
-            self.check_operstate(linux_client)
-        else:
-            self.check_operstate(self.linux_client)
-
-    def check_network_mode(self, linux_client=None):
-        if linux_client:
-            linux_client.set_promisc()
-            linux_client.check_promisc()
-        else:
-            self.linux_client.set_promisc()
-            self.linux_client.check_promisc()
+    def check_network_mode(self, linux_client):
+        linux_client.set_promisc()
+        linux_client.check_promisc()
 
     def wait_big_disk(self, linux_client):
         log_path = '/var/log/cloud-init-output.log'
         log_message = 'copied'
         error_message = 'Failed running'
         _start_time = time.time()
-        timeout = 300
+        timeout = 500
         while True:
             finished_script = linux_client.check_log(log_path, log_message)
             fail = linux_client.check_log(log_path, error_message)
@@ -318,16 +275,22 @@ class Network(manager.LisBase):
             if finished_script:
                 break
             if self._is_timed_out(_start_time, timeout):
+                host = linux_client.ssh_client.host
                 LOG.exception("Failed to retrieve cloud-init status"
                               " connection to %s@%s after %d seconds",
-                              self.ssh_user, linux_client.ssh_client.host, timeout)
-                raise exceptions.SSHTimeout()
+                              self.ssh_user, host, timeout)
+                raise exceptions.SSHTimeout(host=host, user=self.ssh_user)
             time.sleep(30)
 
     def _is_timed_out(self, start_time, timeout):
         return (time.time() - timeout) > start_time
 
-    def set_legacy(self, linux_client=None):
+    def create_port_from_network(self, network):
+        port = self._create_port(network)
+        ip = port['fixed_ips'][0]['ip_address']
+        return ip
+
+    def set_legacy(self, linux_client):
         network = self.get_default_network()
         port = self._create_port(network)
         snet_id = port['fixed_ips'][0]['subnet_id']
@@ -335,12 +298,9 @@ class Network(manager.LisBase):
         ip = port['fixed_ips'][0]['ip_address']
         gateway = snet['gateway_ip']
         netmask = snet['cidr'].split('/')[1]
-        if linux_client:
-            linux_client.set_legacy_adapter(ip, netmask, gateway)
-        else:
-            self.linux_client.set_legacy_adapter(ip, netmask, gateway)
+        linux_client.set_legacy_adapter(ip, netmask, gateway)
 
-    def _initiate_linux_client(self, server_or_ip, username, private_key):
+    def _init_client(self, server_or_ip, username, private_key):
         try:
             return self.get_remote_client(
                 server_or_ip=server_or_ip,
@@ -351,21 +311,19 @@ class Network(manager.LisBase):
             self._log_console_output()
             raise exc
 
-    def set_mac_spoofing(self, vm):
-        self.host_client.run_powershell_cmd(
-            'Set-VMNetworkAdapter',
-            ComputerName=vm2['host_name'],
-            VMName=vm2['instance_name'],
-            MacAddressSpoofing='on')
-
-    def _set_bridge(self, linux_client, static_ip, netmask, dev1, dev2):
-        script = 'SetBridge.sh'
-        cmd = './{script} {ip} {netmask} {dev1} {dev2}'.format(
-            script=script,
-            ip=static_ip,
-            netmask=netmask,
-            dev1=dev1,
-            dev2=dev2)
+    @test.attr(type=['smoke', 'core'])
+    @test.services('compute', 'network')
+    def test_copy_large_file(self):
+        user_datas = ('big_file', 'ssh')
+        self.spawn_copy_large_vm(user_datas)
+        vm1 = self.instances[0]
+        vm2 = self.instances[1]
+        key = self.keypair['private_key']
+        key_name = self.keypair['name']
+        user = self.ssh_user
+        vm1_client = self._init_client(vm1['floating_ip'], user, key)
+        self.wait_big_disk(vm1_client)
+        self.copy_large_file(vm1_client, key_name, user, vm2['floating_ip'])
 
     @test.attr(type=['smoke', 'core'])
     @test.services('compute', 'network')
@@ -373,37 +331,40 @@ class Network(manager.LisBase):
         self.spawn_vm_bridge()
         vm1 = self.instances[0]
         vm2 = self.instances[1]
-        vm3 = self.instances[1]
+        vm3 = self.instances[2]
+        private_netmask = vm1['private_ip_netmask']
+        key = self.keypair['private_key']
+        user = self.ssh_user
         self.stop_vm(vm2['id'])
-        # self._initiate_host_client(vm2['host_name'])
-        # self.set_mac_spoofing(vm2])
-        # self.start_vm(vm2['id'])
-        # vm1_lin_clt = self._initiate_linux_client(vm1['floating_ip']['ip'],
-        #                                           self.ssh_user, self.keypair['private_key'])
-        # self.set_ip(ip=vm1['private_ip'], netmask=vm1['private_ip_netmask'],
-        #             interface='eth1', linux_client=vm1_lin_clt)
-        # vm2_lin_clt = self._initiate_linux_client(vm2['floating_ip']['ip'],
-        #                                           self.ssh_user, self.keypair['private_key'])
-        # self.set_ip(ip=vm2['private_ip_1'], netmask=vm2['private_ip_netmask_1'],
-        #             interface='eth1', linux_client=vm2_lin_clt)
-        # self.set_ip(ip=vm2['private_ip_2'], netmask=vm2['private_ip_netmask_2'],
-        #             interface='eth2', linux_client=vm2_lin_clt)
-        # _create_port_from_network()
-        # self._set_bridge(vm2_lin_clt, _extra_port, vm2['private_ip_netmask_2'], 'eth1', 'eth2')
-        # vm3_lin_clt = self._initiate_linux_client(vm3['floating_ip']['ip'],
-        #                                           self.ssh_user, self.keypair['private_key'])
-        # self.set_ip(ip=vm3['private_ip'], netmask=vm3['private_ip_netmask'],
-        #             interface='eth1', linux_client=vm3_lin_clt)
-        # self.verify_ping(
-        # destination=vm1['private_ip'], interface='eth1',
-        # linux_client=vm2_lin_clt)
+        self._initiate_host_client(vm2['host_name'])
+        self.set_mac_spoofing(vm2)
+        self.start_vm(vm2['id'])
+        vm1_client = self._init_client(vm1['floating_ip'], user, key)
+        vm2_client = self._init_client(vm2['floating_ip'], user, key)
+        vm3_client = self._init_client(vm3['floating_ip'], user, key)
+
+        vm1_eth1 = vm1_client.get_dev_by_mac(vm1['private_mac'])
+        vm2_eth1 = vm2_client.get_dev_by_mac(vm2['private_mac_1'])
+        vm2_eth2 = vm2_client.get_dev_by_mac(vm2['private_mac_2'])
+        vm3_eth1 = vm3_client.get_dev_by_mac(vm3['private_mac'])
+        vm1_client.set_ip(vm1['private_ip'], private_netmask, vm1_eth1)
+        vm2_client.set_ip(vm2['private_ip_1'], private_netmask, vm2_eth1)
+        vm2_client.set_ip(vm2['private_ip_2'], private_netmask, vm2_eth2)
+        vm3_client.set_ip(vm3['private_ip'], private_netmask, vm3_eth1)
+
+        ip = self.create_port_from_network(self.bridge_network)
+        self._set_bridge(vm2_client, ip, private_netmask, vm2_eth1, vm2_eth2)
+
+        self.verify_ping(vm3['private_ip'], vm1_eth1, vm1_client)
+        self.verify_ping(vm1['private_ip'], vm3_eth1, vm3_client)
 
     @test.attr(type=['smoke', 'core'])
     @test.services('compute', 'network')
     def test_external_network(self):
-        self.spawn_vm()
-        self.linux_client = self._initiate_linux_client(self.instances[0]['floating_ip']['ip'],
-                                                        self.ssh_user, self.keypair['private_key'])
+        vm = self.spawn_vm_basic()
+        key = self.keypair['private_key']
+        self.linux_client = self._init_client(
+            vm['floating_ip'], self.ssh_user, key)
         self.verify_ping('8.8.8.8')
 
     @test.attr(type=['smoke', 'core'])
@@ -412,87 +373,66 @@ class Network(manager.LisBase):
         self.spawn_vm_private()
         vm1 = self.instances[0]
         vm2 = self.instances[1]
-        vm1_lin_clt = self._initiate_linux_client(vm1['floating_ip']['ip'],
-                                                  self.ssh_user, self.keypair['private_key'])
-        self.set_ip(ip=vm1['private_ip'], netmask=vm1['private_ip_netmask'],
-                    interface='eth1', linux_client=vm1_lin_clt)
-        vm2_lin_clt = self._initiate_linux_client(vm2['floating_ip']['ip'],
-                                                  self.ssh_user, self.keypair['private_key'])
-        self.set_ip(ip=vm2['private_ip'], netmask=vm2['private_ip_netmask'],
-                    interface='eth1', linux_client=vm2_lin_clt)
-        self.verify_ping(
-            destination=vm1['private_ip'], interface='eth1', linux_client=vm2_lin_clt)
+        key = self.keypair['private_key']
+        private_netmask = vm1['private_ip_netmask']
+        vm1_client = self._init_client(vm1['floating_ip'], self.ssh_user, key)
+        vm2_client = self._init_client(vm2['floating_ip'], self.ssh_user, key)
 
-    @test.attr(type=['smoke', 'core'])
-    @test.services('compute', 'network')
-    def test_copy_large_file(self):
-        user_datas = ('big_file', 'ssh')
-        self.spawn_double_vm()
-        vm1 = self.instances[0]
-        vm2 = self.instances[1]
-        vm1_lin_clt = self._initiate_linux_client(vm1['floating_ip']['ip'],
-                                                  self.ssh_user, self.keypair['private_key'])
-        vm2_lin_clt = self._initiate_linux_client(vm2['floating_ip']['ip'],
-                                                  self.ssh_user, self.keypair['private_key'])
-        self.wait_big_disk(vm1_lin_clt)
-        self.copy_over(
-            linux_client=vm1_lin_clt, ip_destination=vm2['private_ip'], user=self.ssh_user)
+        vm1_eth1 = vm1_client.get_dev_by_mac(vm1['private_mac'])
+        vm2_eth1 = vm2_client.get_dev_by_mac(vm2['private_mac'])
+        vm1_client.set_ip(vm1['private_ip'], private_netmask, vm1_eth1)
+        vm1_client.set_ip(vm2['private_ip'], private_netmask, vm2_eth1)
+
+        self.verify_ping(vm1['private_ip'], vm1_eth1, vm2_lin_clt)
 
     @test.attr(type=['smoke', 'core'])
     @test.services('compute', 'network')
     def test_multiple_networks(self):
-        self.spawn_vm_multi_nic()
-        vm1 = self.instances[0]
-        vm1_lin_clt = self._initiate_linux_client(vm1['floating_ip']['ip'],
-                                                  self.ssh_user, self.keypair['private_key'])
-        self.verify_ping(
-            destination='8.8.8.8', interface='eth0', linux_client=vm1_lin_clt)
-        vm1_lin_clt.refresh_iface('eth1')
-        self.verify_ping(destination=vm1['snet_gateway_ip'],
-                         interface='eth1', linux_client=vm1_lin_clt)
-
-    @test.attr(type=['smoke', 'core'])
-    @test.services('compute', 'network')
-    def test_static_mac(self):
-        self.spawn_vm()
-        self.linux_client = self._initiate_linux_client(self.instances[0]['floating_ip']['ip'],
-                                                        self.ssh_user, self.keypair['private_key'])
-        vm = self.instances[0]
-        self.check_mac(vm['static_mac'])
-
-    @test.attr(type=['smoke', 'core'])
-    @test.services('compute', 'network')
-    def test_network_mode(self):
-        self.spawn_vm()
-        self.linux_client = self._initiate_linux_client(self.instances[0]['floating_ip']['ip'],
-                                                        self.ssh_user, self.keypair['private_key'])
-        vm = self.instances[0]
-        self.check_network_mode()
+        vm = self.spawn_vm_multi_nic()
+        key = self.keypair['private_key']
+        linux_client = self._init_client(vm['floating_ip'], self.ssh_user, key)
+        self.verify_ping('8.8.8.8', 'eth0', linux_client)
+        linux_client.refresh_iface('eth1')
+        self.verify_ping(vm['snet_gateway_ip'], 'eth1', linux_client)
 
     @test.attr(type=['smoke', 'core'])
     @test.services('compute', 'network')
     def test_network_legacy(self):
-        self.spawn_vm()
-        vm = self.instances[0]
-        self.linux_client = self._initiate_linux_client(vm['floating_ip']['ip'],
-                                                        self.ssh_user, self.keypair['private_key'])
+        vm = self.spawn_vm_basic()
+        key = self.keypair['private_key']
+        linux_client = self._init_client(vm['floating_ip'], self.ssh_user, key)
         self._initiate_host_client(vm['host_name'])
         self.stop_vm(vm['id'])
         self.add_legacy_nic(vm['instance_name'], vm['host_name'])
         self.start_vm(vm['id'])
         self.linux_client.validate_authentication()
-        self.set_legacy()
+        self.set_legacy(linux_client)
+
+    @test.attr(type=['smoke', 'core'])
+    @test.services('compute', 'network')
+    def test_static_mac(self):
+        vm = self.spawn_vm_basic(mac=True)
+        key = self.keypair['private_key']
+        linux_client = self._init_client(vm['floating_ip'], self.ssh_user, key)
+        self.check_mac(linux_client, vm['static_mac'])
+
+    @test.attr(type=['smoke', 'core'])
+    @test.services('compute', 'network')
+    def test_network_mode(self):
+        vm = self.spawn_vm_basic(mac=True)
+        key = self.keypair['private_key']
+        linux_client = self._init_client(vm['floating_ip'], self.ssh_user, key)
+        self.check_network_mode(linux_client)
 
     @test.attr(type=['smoke', 'core'])
     @test.services('compute', 'network')
     def test_operstate(self):
-        self.spawn_vm()
-        self.linux_client = self._initiate_linux_client(self.instances[0]['floating_ip']['ip'],
-                                                        self.ssh_user, self.keypair['private_key'])
-        vm = self.instances[0]
+        vm = self.spawn_vm_basic(mac=True)
+        key = self.keypair['private_key']
+        linux_client = self._init_client(vm['floating_ip'], self.ssh_user, key)
         self._initiate_host_client(vm['host_name'])
         self.stop_vm(vm['id'])
         self.add_empty_nic(vm['instance_name'], vm['host_name'])
         self.start_vm(vm['id'])
         self.linux_client.validate_authentication()
-        self.check_nic_operstate()
+        self.check_operstate(linux_client)
