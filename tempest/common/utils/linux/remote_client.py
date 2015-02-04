@@ -140,7 +140,12 @@ class RemoteClient(RemoteClientBase):
         return self.exec_command(cmd)
 
     def set_ip(self, ip, netmask, interface):
-        cmd = 'sudo ip addr add %s/%s dev %s' % (ip, netmask, interface)
+        cmd = ('sudo ip addr add %(ip)s/%(netmask)s dev %(interface)s;'
+               'sudo ip link set %(interface)s down;'
+               'sudo ip link set %(interface)s up;'
+               '') % {'interface': interface,
+                      'ip': ip,
+                      'netmask': netmask}
         return self.exec_command(cmd)
 
     def refresh_iface(self, interface):

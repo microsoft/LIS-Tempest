@@ -77,22 +77,6 @@ class Network(manager.LisBase):
                                       create_kwargs=create_kwargs)
         return instance
 
-    def get_default_network_id(self):
-        fixed_network_name = CONF.compute.fixed_network_name
-        _, networks = self.networks_client.list_networks()
-        if len(networks) > 1:
-            for network in networks:
-                if network['label'] == fixed_network_name:
-                    network_id = network['id']
-                    break
-            else:
-                msg = ("The network on which the NIC of the server must "
-                       "be connected can not be found : "
-                       "fixed_network_name=%s. Starting instance without "
-                       "specifying a network.") % fixed_network_name
-                LOG.info(msg)
-        return network_id
-
     def get_default_network(self):
         fixed_network_name = CONF.compute.fixed_network_name
         _, networks = self.networks_client.list_networks()
@@ -122,10 +106,11 @@ class Network(manager.LisBase):
         security_groups = [self.security_group]
         create_kwargs = {
             'key_name': self.keypair['name'],
-            'security_groups': security_groups
+            'security_groups': security_groups,
+            'availability_zone': 'nova:%s' % 'R2D2'
         }
-
-        create_kwargs['networks'] = [{'uuid': self.get_default_network_id()}]
+        net = self.get_default_network()
+        create_kwargs['networks'] = [{'uuid': net['id']}]
         if networks:
             for net_id in networks:
                 create_kwargs['networks'].append({'uuid': net_id})
@@ -156,6 +141,7 @@ class Network(manager.LisBase):
         return instance
 
     def spawn_vm_basic(self, mac=False):
+        fixed_network_name = CONF.compute.fixed_network_name
         self.add_keypair()
         self.security_group = self._create_security_group()
         create_kwargs = self.get_default_kwargs()
@@ -166,13 +152,18 @@ class Network(manager.LisBase):
         return instance
 
     def spawn_vm_multi_nic(self):
+        fixed_network_name = CONF.compute.fixed_network_name
         self.add_keypair()
         self.security_group = self._create_security_group()
         network, snet, router = self.create_networks()
         create_kwargs = self.get_default_kwargs(
-            user_data=False, networks=[network['id']])
+            user_data=None, networks=[network['id']])
         instance = self._spawn_vm(create_kwargs)
-        instance['snet_gateway_ip'] = snet['gateway_ip']
+        instance['gateway_2'] = snet['gateway_ip']
+        instance['mac_1'] = instance['addresses'][
+            fixed_network_name][0]['OS-EXT-IPS-MAC:mac_addr']
+        instance['mac_2'] = instance['addresses'][
+            network['name']][0]['OS-EXT-IPS-MAC:mac_addr']
         return instance
 
     def spawn_vm_private(self):
@@ -181,7 +172,7 @@ class Network(manager.LisBase):
         name = data_utils.rand_name('physnet_private_1_')
         network, snet, router = self.create_networks(phys_net_type=name)
         create_kwargs = self.get_default_kwargs(
-            user_data=True, networks=[network['id']])
+            user_data=None, networks=[network['id']])
         for _ in xrange(2):
             instance = self._spawn_vm(create_kwargs)
             netw = instance['addresses'][network['name']][0]
@@ -201,17 +192,18 @@ class Network(manager.LisBase):
         self.bridge_network = pr_net_1
 
         create_kwargs = self.get_default_kwargs(
-            user_data=False, networks=[pr_net_1['id']])
+            user_data=None, networks=[pr_net_1['id']])
         instance = self._spawn_vm(create_kwargs)
         instance['private_ip'] = instance[
             'addresses'][pr_net_1['name']][0]['addr']
         instance['private_mac'] = instance['addresses'][
             pr_net_1['name']][0]['OS-EXT-IPS-MAC:mac_addr']
         instance['private_ip_netmask'] = pr_snet_1['cidr'].split('/')[1]
+        instance['private_gateway'] = pr_snet_1['gateway_ip']
         self.instances.append(instance)
 
         create_kwargs = self.get_default_kwargs(
-            user_data=False, networks=[pr_net_1['id'], pr_net_2['id']])
+            user_data=None, networks=[pr_net_1['id'], pr_net_2['id']])
         instance = self._spawn_vm(create_kwargs)
         instance['private_ip_1'] = instance[
             'addresses'][pr_net_1['name']][0]['addr']
@@ -224,7 +216,7 @@ class Network(manager.LisBase):
         self.instances.append(instance)
 
         create_kwargs = self.get_default_kwargs(
-            user_data=False, networks=[pr_net_2['id']])
+            user_data=None, networks=[pr_net_2['id']])
         instance = self._spawn_vm(create_kwargs)
         instance['private_ip'] = instance[
             'addresses'][pr_net_2['name']][0]['addr']
@@ -310,6 +302,13 @@ class Network(manager.LisBase):
             self._log_console_output()
             raise exc
 
+    def get_gateway(self):
+        net = self.get_default_network()
+        netw = self._list_networks(id=net['id'])
+        subnet = self._list_subnets(id=netw[0]['subnets'][0])
+        subnet_gateway = subnet[0]['gateway_ip']
+        return subnet_gateway
+
     @test.attr(type=['smoke', 'core'])
     @test.services('compute', 'network')
     def test_copy_large_file(self):
@@ -332,8 +331,10 @@ class Network(manager.LisBase):
         vm2 = self.instances[1]
         vm3 = self.instances[2]
         private_netmask = vm1['private_ip_netmask']
+        gateway = vm1['private_gateway']
         key = self.keypair['private_key']
         user = self.ssh_user
+
         self.stop_vm(vm2['id'])
         self._initiate_host_client(vm2['host_name'])
         self.set_mac_spoofing(vm2)
@@ -346,6 +347,7 @@ class Network(manager.LisBase):
         vm2_eth1 = vm2_client.get_dev_by_mac(vm2['private_mac_1'])
         vm2_eth2 = vm2_client.get_dev_by_mac(vm2['private_mac_2'])
         vm3_eth1 = vm3_client.get_dev_by_mac(vm3['private_mac'])
+
         vm1_client.set_ip(vm1['private_ip'], private_netmask, vm1_eth1)
         vm2_client.set_ip(vm2['private_ip_1'], private_netmask, vm2_eth1)
         vm2_client.set_ip(vm2['private_ip_2'], private_netmask, vm2_eth2)
@@ -353,7 +355,6 @@ class Network(manager.LisBase):
 
         ip = self.create_port_from_network(self.bridge_network)
         self._set_bridge(vm2_client, ip, private_netmask, vm2_eth1, vm2_eth2)
-
         self.verify_ping(vm3['private_ip'], vm1_eth1, vm1_client)
         self.verify_ping(vm1['private_ip'], vm3_eth1, vm3_client)
 
@@ -364,7 +365,8 @@ class Network(manager.LisBase):
         key = self.keypair['private_key']
         self.linux_client = self._init_client(
             vm['floating_ip'], self.ssh_user, key)
-        self.verify_ping('8.8.8.8')
+        gateway_ip = self.get_gateway()
+        self.verify_ping(gateway_ip)
 
     @test.attr(type=['smoke', 'core'])
     @test.services('compute', 'network')
@@ -374,25 +376,27 @@ class Network(manager.LisBase):
         vm2 = self.instances[1]
         key = self.keypair['private_key']
         private_netmask = vm1['private_ip_netmask']
+
         vm1_client = self._init_client(vm1['floating_ip'], self.ssh_user, key)
         vm2_client = self._init_client(vm2['floating_ip'], self.ssh_user, key)
-
         vm1_eth1 = vm1_client.get_dev_by_mac(vm1['private_mac'])
         vm2_eth1 = vm2_client.get_dev_by_mac(vm2['private_mac'])
         vm1_client.set_ip(vm1['private_ip'], private_netmask, vm1_eth1)
-        vm1_client.set_ip(vm2['private_ip'], private_netmask, vm2_eth1)
+        vm2_client.set_ip(vm2['private_ip'], private_netmask, vm2_eth1)
 
-        self.verify_ping(vm1['private_ip'], vm1_eth1, vm2_lin_clt)
+        self.verify_ping(vm1['private_ip'], vm1_eth1, vm2_client)
 
     @test.attr(type=['smoke', 'core'])
     @test.services('compute', 'network')
     def test_multiple_networks(self):
         vm = self.spawn_vm_multi_nic()
         key = self.keypair['private_key']
-        linux_client = self._init_client(vm['floating_ip'], self.ssh_user, key)
-        self.verify_ping('8.8.8.8', 'eth0', linux_client)
-        linux_client.refresh_iface('eth1')
-        self.verify_ping(vm['snet_gateway_ip'], 'eth1', linux_client)
+        vm_eth0 = linux_client.get_dev_by_mac(vm['mac_1'])
+        vm_eth1 = linux_client.get_dev_by_mac(vm['mac_2'])
+        gateway_ip = self.get_gateway()
+        self.verify_ping(gateway_ip, vm_eth0, linux_client)
+        linux_client.refresh_iface(vm_eth1)
+        self.verify_ping(vm['gateway_2'], vm_eth1, linux_client)
 
     @test.attr(type=['smoke', 'core'])
     @test.services('compute', 'network')
@@ -404,7 +408,7 @@ class Network(manager.LisBase):
         self.stop_vm(vm['id'])
         self.add_legacy_nic(vm['instance_name'], vm['host_name'])
         self.start_vm(vm['id'])
-        self.linux_client.validate_authentication()
+        linux_client.validate_authentication()
         self.set_legacy(linux_client)
 
     @test.attr(type=['smoke', 'core'])
