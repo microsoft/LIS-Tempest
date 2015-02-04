@@ -2646,7 +2646,5 @@ class LisBase(ScenarioTest):
         my_path = os.path.abspath(
             os.path.normpath(os.path.dirname(__file__)))
         full_script_path = my_path + script_path
-        import pdb
-        pdb.set_trace()
         linux_client.execute_script(
             script_name, args, full_script_path, destination)
