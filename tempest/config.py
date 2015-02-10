@@ -264,20 +264,26 @@ HostGroup = [
                     "This is a required option"),
     cfg.StrOpt('host_setupscripts_folder',
                help="Hyper-V setupscripts folder "
-                    "This is a required option"),
-    cfg.StrOpt('host_vssbackup_drive',
-               help='Target drive for the Hyper-V VSS backups.'
-                    'This drive has to be different from the boot drive.'
-                    'This is a required option')
+                    "This is a required option")
 ]
 
-lis_group = cfg.OptGroup(name='lis',
-                         title='LIS test specific info')
+lis_group = cfg.OptGroup(name='lis_specific',
+                         title='LIS tests specific info')
 
 LisGroup = [
-    cfg.StrOpt('private_network',
-               help='Valid private network needed by some test cases'
-                    'This has to not overlap with existing openstack networks'
+    cfg.IntOpt('copy_large_file_size',
+               default=2,
+               help='Size in GBs for copy large file test case'
+                    "This is a required option"),
+    cfg.IntOpt('copy_large_file_timeout',
+               default=300,
+               help='Timeout in seconds for copy large file test case'
+                    "This is a required option"),
+    cfg.StrOpt('phys_private_1',
+               help='Mapping between physnet and hyper-v first private vSwitch'
+                    "This is a required option"),
+    cfg.StrOpt('phys_private_2',
+               help='Mapping between physnet and hyper-v second private vSwitch'
                     "This is a required option")
 ]
 

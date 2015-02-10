@@ -106,8 +106,7 @@ class Network(manager.LisBase):
         security_groups = [self.security_group]
         create_kwargs = {
             'key_name': self.keypair['name'],
-            'security_groups': security_groups,
-            'availability_zone': 'nova:%s' % 'R2D2'
+            'security_groups': security_groups
         }
         net = self.get_default_network()
         create_kwargs['networks'] = [{'uuid': net['id']}]
@@ -120,12 +119,13 @@ class Network(manager.LisBase):
         return create_kwargs
 
     def _get_userdata(self, user_data):
+        file_size = CONF.lis_specific.copy_large_file_size
         key = self.keypair['private_key']
         msg = self.user_data_base[user_data]
         user_data_message = msg % {'home': self.ssh_user,
                                    'content': key,
                                    'name': self.keypair['name'],
-                                   'gb_count': 2}
+                                   'gb_count': file_size}
         return base64.encodestring(user_data_message)
 
     def _spawn_vm(self, create_kwargs):
@@ -167,9 +167,10 @@ class Network(manager.LisBase):
         return instance
 
     def spawn_vm_private(self):
+        private = CONF.lis_specific.phys_private_1
         self.add_keypair()
         self.security_group = self._create_security_group()
-        name = data_utils.rand_name('physnet_private_1_')
+        name = data_utils.rand_name(private)
         network, snet, router = self.create_networks(phys_net_type=name)
         create_kwargs = self.get_default_kwargs(
             user_data=None, networks=[network['id']])
@@ -182,10 +183,12 @@ class Network(manager.LisBase):
             self.instances.append(instance)
 
     def spawn_vm_bridge(self):
+        private = CONF.lis_specific.phys_private_1
+        private_2 = CONF.lis_specific.phys_private_2
         self.add_keypair()
         self.security_group = self._create_security_group()
-        pr1 = data_utils.rand_name('physnet_private_1_')
-        pr2 = data_utils.rand_name('physnet_private_2_')
+        pr1 = data_utils.rand_name(private)
+        pr2 = data_utils.rand_name(private_2)
         pr_net_1, pr_snet_1, r = self.create_networks(phys_net_type=pr1)
         pr_net_2, pr_snet_2, r = self.create_networks(
             phys_net_type=pr2, existing_cidr=pr_snet_1['cidr'])
@@ -257,8 +260,8 @@ class Network(manager.LisBase):
         log_path = '/var/log/cloud-init-output.log'
         log_message = 'copied'
         error_message = 'Failed running'
+        timeout = CONF.lis_specific.copy_large_file_timeout
         _start_time = time.time()
-        timeout = 500
         while True:
             finished_script = linux_client.check_log(log_path, log_message)
             fail = linux_client.check_log(log_path, error_message)
@@ -391,6 +394,7 @@ class Network(manager.LisBase):
     def test_multiple_networks(self):
         vm = self.spawn_vm_multi_nic()
         key = self.keypair['private_key']
+        linux_client = self._init_client(vm['floating_ip'], self.ssh_user, key)
         vm_eth0 = linux_client.get_dev_by_mac(vm['mac_1'])
         vm_eth1 = linux_client.get_dev_by_mac(vm['mac_2'])
         gateway_ip = self.get_gateway()
