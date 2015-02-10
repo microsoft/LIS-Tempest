@@ -38,21 +38,21 @@ class VSS(manager.LisBase):
         self.image_utils = test_utils.ImageUtils()
         if not self.image_utils.is_flavor_enough(self.flavor_ref,
                                                  self.image_ref):
-            raise self.skipException(
-                '{image} does not fit in {flavor}'.format(
-                    image=self.image_ref, flavor=self.flavor_ref
-                )
-            )
+            skip_message = '%(image)s does not fit in %(flavor)s' % {
+                'image': self.image_ref,
+                'flavor': self.flavor_ref}
+            raise self.skipException(skip_message)
+
         self.host_name = ""
         self.instance_name = ""
         self.filename = '~/testfile.txt'
-        self.run_ssh = CONF.compute.run_ssh and \
-            self.image_utils.is_sshable_image(self.image_ref)
+        self.run_ssh = (CONF.compute.run_ssh and
+                        self.image_utils.is_sshable_image(self.image_ref))
         self.ssh_user = CONF.compute.ssh_user
-        LOG.debug('Starting test for i:{image}, f:{flavor}. '
-                  'Run ssh: {ssh}, user: {ssh_user}'.format(
-                      image=self.image_ref, flavor=self.flavor_ref,
-                      ssh=self.run_ssh, ssh_user=self.ssh_user))
+        LOG.debug('Starting test for image: %(image)s, flavor: %(flavor)s.'
+                  'User: %(ssh_user)s ' % {'image': self.image_ref,
+                                           'flavor': self.flavor_ref,
+                                           'ssh_user': self.ssh_user})
 
     def add_keypair(self):
         self.keypair = self.create_keypair()
@@ -111,19 +111,19 @@ class VSS(manager.LisBase):
     def create_file(self):
         """ Create a file on the vm """
         output = self.linux_client.create_file(self.filename)
+        self.assertIsNotNone(output, 'Failed to create file on VM')
         LOG.info('Created file %s' % output)
-        self.assertIsNotNone(output)
 
     def verify_file(self):
         """ Verify if the file exists on the vm """
         output = self.linux_client.verify_file(self.filename)
-        LOG.info('File is present on the VM. ')
-        self.assertIsNotNone(output)
+        self.assertIsNotNone(output, 'Failed to check file on VM')
+        LOG.info('File is present on the VM.')
 
     def delete_file(self):
         """ Delete the file from the vm """
-        self.linux_client.delete_file(self.filename)
         LOG.info('Deleting file from the the VM.')
+        self.linux_client.delete_file(self.filename)
 
     def backup_vm(self, instance_name):
         """Take a VSS live backup of the VM"""
@@ -157,13 +157,11 @@ class VSS(manager.LisBase):
 
     def _add_disks(self, pos, vhd_type, exc_dsk_cnt, filesystem):
         self.stop_vm(self.server_id)
-        if isinstance(pos, list):
-            for position in pos:
-                self.add_disk(self.instance_name, self.disk_type,
-                              position, vhd_type, self.sector_size)
-        else:
+        if not isinstance(pos, list):
+            pos = [pos]
+        for position in pos:
             self.add_disk(self.instance_name, self.disk_type,
-                          pos, vhd_type, self.sector_size)
+                          position, vhd_type, self.sector_size)
         self.start_vm(self.server_id)
         self.linux_client.validate_authentication()
         self.format_disk(exc_dsk_cnt, filesystem)
@@ -189,13 +187,11 @@ class VSS(manager.LisBase):
                 self.detach_passthrough(disk)
 
     def _test_pass_ide(self, pos, exc_dsk_cnt, filesystem):
-        if isinstance(pos, list):
-            for position in pos:
-                self.add_pass_disk(self.instance_name, position)
-        else:
-            self.add_pass_disk(self.instance_name, pos)
+        if not isinstance(pos, list):
+            pos = [pos]
+        for position in pos:
+            self.add_pass_disk(self.instance_name, position)
         self.format_disk(exc_dsk_cnt, filesystem)
-
 
     def create_child_vm(self, server_id):
         temp_image = self.create_server_snapshot(server_id)
@@ -208,13 +204,11 @@ class VSS(manager.LisBase):
 
     def _add_disk_fail(self, pos, vhd_type, exc_dsk_cnt, filesystem):
         self.stop_vm(self.server_id)
-        if isinstance(pos, list):
-            for position in pos:
-                self.add_disk(self.instance_name, self.disk_type,
-                              position, vhd_type, self.sector_size)
-        else:
+        if not isinstance(pos, list):
+            pos = [pos]
+        for position in pos:
             self.add_disk(self.instance_name, self.disk_type,
-                          pos, vhd_type, self.sector_size)
+                          position, vhd_type, self.sector_size)
         self.start_vm(self.server_id)
         self.linux_client.validate_authentication()
         self.freeze_fs(exc_dsk_cnt, filesystem)

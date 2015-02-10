@@ -186,7 +186,7 @@ class RemoteClient(RemoteClientBase):
         output = self.exec_command(cmd)
         return output
 
-    def verify_deamon(self, deamon):
+    def verify_daemon(self, deamon):
         cmd = 'ps cax | grep %s' % deamon
         output = self.exec_command(cmd)
         return output
@@ -216,7 +216,7 @@ class RemoteClient(RemoteClientBase):
         return self.exec_command(cmd)
 
     def verify_vss_deamon(self):
-        return self.verify_deamon('hv_vss_daemon')
+        return self.verify_daemon('hv_vss_daemon')
 
 
 class FedoraUtils(RemoteClient):
@@ -236,10 +236,10 @@ class Fedora7Utils(RemoteClient):
     def get_os_type(self):
         return 'fedora7'
 
-    def verify_deamon(self, deamon_name):
+    def verify_daemon(self, deamon_name):
         cmd = 'systemctl list-units --type=service | grep %s ' % deamon_name
         output = self.exec_command(cmd)
         return output
 
     def verify_vss_deamon(self):
-        return self.verify_deamon('hypervvssd')
+        return self.verify_daemon('hypervvssd')

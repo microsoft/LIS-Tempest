@@ -232,7 +232,7 @@ class ScenarioTest(tempest.test.BaseTestCase):
             if len(networks) > 1:
                 for network in networks:
                     if network['label'] == fixed_network_name:
-                        create_kwargs['nics'] = [{'net-id': network['id']}]
+                        create_kwargs['networks'] = [{'uuid': network['id']}]
                         break
                 # If we didn't find the network we were looking for :
                 else:
@@ -424,22 +424,18 @@ class ScenarioTest(tempest.test.BaseTestCase):
                                                              length=None))
 
     def create_server_snapshot(self, server, name=None):
-        # Glance client
-        _image_client = self.image_client
-        # Compute client
-        _images_client = self.images_client
         if name is None:
             name = data_utils.rand_name('scenario-snapshot-')
         LOG.debug("Creating a snapshot image for server: %s", server['name'])
-        resp, image = _images_client.create_image(server['id'], name)
+        resp, image = self.images_client.create_image(server['id'], name)
         image_id = resp['location'].split('images/')[1]
-        _image_client.wait_for_image_status(image_id, 'active')
+        self.image_client.wait_for_image_status(image_id, 'active')
         self.addCleanup_with_wait(
-            waiter_callable=_image_client.wait_for_resource_deletion,
+            waiter_callable=self.image_client.wait_for_resource_deletion,
             thing_id=image_id, thing_id_param='id',
             cleanup_callable=self.delete_wrapper,
-            cleanup_args=[_image_client.delete_image, image_id])
-        _, snapshot_image = _image_client.get_image_meta(image_id)
+            cleanup_args=[self.image_client.delete_image, image_id])
+        _, snapshot_image = self.image_client.get_image_meta(image_id)
         image_name = snapshot_image['name']
         self.assertEqual(name, image_name)
         LOG.debug("Created snapshot image %s for server %s",
