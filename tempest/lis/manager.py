@@ -2631,6 +2631,17 @@ class LisBase(ScenarioTest):
             vmName=instance_name,
             hvServer=host_name)
 
+    def set_internal_nic(self, gateway, mac_address, instance_name, host_name):
+        """Attach Disk to VM"""
+
+        script_location = "%s%s" % (self.script_folder,
+                                    'setupscripts\\set_internal_nic.ps1')
+        self.host_client.run_powershell_cmd(
+            script_location,
+            vmName=instance_name,
+            hvServer=host_name,
+            mac=mac_address,
+            gateway=gateway)
 
     def set_mac_spoofing(self, vm):
         self.host_client.run_powershell_cmd(

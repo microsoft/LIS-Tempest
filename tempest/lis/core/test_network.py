@@ -182,6 +182,23 @@ class Network(manager.LisBase):
             instance['private_ip_netmask'] = snet['cidr'].split('/')[1]
             self.instances.append(instance)
 
+    def spawn_vm_internal(self):
+        #internal = CONF.lis_specific.phys_private_1
+        internal = 'physnet_internal_2'
+        self.add_keypair()
+        self.security_group = self._create_security_group()
+        name = data_utils.rand_name(internal)
+        network, snet, router = self.create_networks(phys_net_type=name)
+        create_kwargs = self.get_default_kwargs(
+            user_data=None, networks=[network['id']])
+        instance = self._spawn_vm(create_kwargs)
+        netw = instance['addresses'][network['name']][0]
+        instance['private_ip'] = netw['addr']
+        instance['private_mac'] = netw['OS-EXT-IPS-MAC:mac_addr']
+        instance['private_ip_netmask'] = snet['cidr'].split('/')[1]
+        instance['gateway'] = snet['gateway_ip']
+        return instance
+
     def spawn_vm_bridge(self):
         private = CONF.lis_specific.phys_private_1
         private_2 = CONF.lis_specific.phys_private_2
@@ -388,6 +405,22 @@ class Network(manager.LisBase):
         vm2_client.set_ip(vm2['private_ip'], private_netmask, vm2_eth1)
 
         self.verify_ping(vm1['private_ip'], vm1_eth1, vm2_client)
+
+    @test.attr(type=['smoke', 'core'])
+    @test.services('compute', 'network')
+    def test_internal_network(self):
+        vm = self.spawn_vm_internal()
+        key = self.keypair['private_key']
+        private_netmask = vm['private_ip_netmask']
+        linux_client = self._init_client(
+            vm['floating_ip'], self.ssh_user, key)
+        self._initiate_host_client(vm['host_name'])
+        vm_eth1 = linux_client.get_dev_by_mac(vm['private_mac'])
+        linux_client.set_ip(vm['private_ip'], private_netmask, vm_eth1)
+        mac = str(vm['private_mac']).translate(None, ':')
+        self.set_internal_nic(
+            vm['gateway'], mac, vm['instance_name'], vm['host_name'])
+        self.verify_ping(vm['gateway'], vm_eth1, linux_client)
 
     @test.attr(type=['smoke', 'core'])
     @test.services('compute', 'network')
