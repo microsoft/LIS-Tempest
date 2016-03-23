@@ -217,6 +217,7 @@ class ScenarioTest(tempest.test.BaseTestCase):
             create_kwargs = {}
 
         fixed_network_name = CONF.compute.fixed_network_name
+        
         if 'nics' not in create_kwargs and fixed_network_name:
             _, networks = self.networks_client.list_networks()
             # If several networks found, set the NetID on which to connect the
@@ -226,7 +227,7 @@ class ScenarioTest(tempest.test.BaseTestCase):
             if len(networks) > 1:
                 for network in networks:
                     if network['label'] == fixed_network_name:
-                        create_kwargs['nics'] = [{'net-id': network['id']}]
+                        create_kwargs['networks'] = [{'uuid': network['id']}]
                         break
                 # If we didn't find the network we were looking for :
                 else:
@@ -235,7 +236,6 @@ class ScenarioTest(tempest.test.BaseTestCase):
                            "fixed_network_name=%s. Starting instance without "
                            "specifying a network.") % fixed_network_name
                     LOG.info(msg)
-
         LOG.debug("Creating a server (name: %s, image: %s, flavor: %s)",
                   name, image, flavor)
         _, server = self.servers_client.create_server(name, image, flavor,

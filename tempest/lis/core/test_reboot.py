@@ -19,6 +19,7 @@ from tempest.common.utils import data_utils
 from tempest.lis import manager
 from tempest.openstack.common import log as logging
 from tempest.scenario import utils as test_utils
+import time
 
 CONF = config.CONF
 
@@ -71,7 +72,7 @@ class Reboot(manager.LisBase):
         self._initiate_host_client(self.host_name)
 
     def nova_floating_ip_create(self):
-        _, self.floating_ip = self.floating_ips_client.create_floating_ip()
+        _, self.floating_ip = self.floating_ips_client.create_floating_ip("public")
         self.addCleanup(self.delete_wrapper,
                         self.floating_ips_client.delete_floating_ip,
                         self.floating_ip['id'])
@@ -84,6 +85,7 @@ class Reboot(manager.LisBase):
         self.add_keypair()
         self.security_group = self._create_security_group()
         self.boot_instance()
+	time.sleep(60)
         self.nova_floating_ip_create()
         self.nova_floating_ip_add()
         self.server_id = self.instance['id']
