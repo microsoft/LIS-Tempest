@@ -71,7 +71,7 @@ class LisModules(manager.LisBase):
         self._initiate_host_client(self.host_name)
 
     def nova_floating_ip_create(self):
-        _, self.floating_ip = self.floating_ips_client.create_floating_ip()
+        _, self.floating_ip = self.floating_ips_client.create_floating_ip("public")
         self.addCleanup(self.delete_wrapper,
                         self.floating_ips_client.delete_floating_ip,
                         self.floating_ip['id'])

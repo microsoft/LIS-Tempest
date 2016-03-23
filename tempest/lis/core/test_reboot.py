@@ -85,7 +85,6 @@ class Reboot(manager.LisBase):
         self.add_keypair()
         self.security_group = self._create_security_group()
         self.boot_instance()
-	time.sleep(60)
         self.nova_floating_ip_create()
         self.nova_floating_ip_add()
         self.server_id = self.instance['id']
