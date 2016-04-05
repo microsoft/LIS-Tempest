@@ -36,7 +36,7 @@ class Reboot(manager.LisBase):
             self.image_ref = CONF.compute.image_ref
         if not hasattr(self, 'flavor_ref'):
             self.flavor_ref = CONF.compute.flavor_ref
-        self.image_utils = test_utils.ImageUtils()
+        self.image_utils = test_utils.ImageUtils(self.manager)
         if not self.image_utils.is_flavor_enough(self.flavor_ref,
                                                  self.image_ref):
             raise self.skipException(
