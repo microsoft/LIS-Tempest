@@ -13,7 +13,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-
+import os
 import select
 import socket
 import time
@@ -38,6 +38,7 @@ class Client(object):
     def __init__(self, host, username, password=None, timeout=300, pkey=None,
                  channel_timeout=10, look_for_keys=False, key_filename=None):
         self.host = host
+        self.port = 22
         self.username = username
         self.password = password
         if isinstance(pkey, six.string_types):
@@ -96,6 +97,58 @@ class Client(object):
 
     def _is_timed_out(self, start_time):
         return (time.time() - self.timeout) > start_time
+
+    def sftp(self, source, destination):
+
+        try:
+            transport = paramiko.Transport((self.host, self.port))
+            transport.start_client()
+            self.agent_auth(transport, self.username)
+            sftp = transport.open_session()
+            sftp = paramiko.SFTPClient.from_transport(transport)
+            is_up_to_date = False
+
+            try:
+                sftp.mkdir(destination)
+            except IOError as e:
+                LOG.exception(e)
+
+            destination_file = destination + '/' + os.path.basename(source)
+            try:
+                if sftp.stat(destination):
+                    source_data = open(source, "rb").read()
+                    destination_data = sftp.open(destination_file).read()
+                    md1 = md5.new(source_data).digest()
+                    md2 = md5.new(destination_data).digest()
+                    if md1 == md2:
+                        is_up_to_date = True
+            except:
+                pass
+
+            if not is_up_to_date:
+                sftp.put(source, destination_file)
+                LOG.info(
+                    "Successfuly copied over %s to %s", source, destination)
+        except Exception as e:
+            raise Exception ('*** Failed to sftp: %s: %s' % (e.__class__, e))
+            try:
+                transport.close()
+            except:
+                pass
+
+    def agent_auth(self, transport, username):
+
+        agent = paramiko.Agent()
+        agent_keys = agent.get_keys() + (self.pkey,)
+        if len(agent_keys) == 0:
+            return
+
+        for key in agent_keys:
+            try:
+                transport.auth_publickey(username, key)
+                return
+            except paramiko.SSHException, e:
+                raise e
 
     @staticmethod
     def _can_system_poll():

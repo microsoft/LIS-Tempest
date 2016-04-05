@@ -1,0 +1,111 @@
+[DEFAULT]
+debug = True
+log_file = tempest.log
+use_stderr = False
+
+[auth]
+use_dynamic_credentials = False
+test_accounts_file = /home/ubuntu/tempest/upvir/lis-tempest/etc/accounts.yaml
+
+[boto]
+http_socket_timeout = 30
+ec2_url = None
+s3_url = None
+s3_materials_path = /home/ubuntu/.rally/tempest/data/s3materials
+
+[host_credentials]
+host_user_name = zdudas
+host_password = Passw0rd
+host_setupscripts_folder = C:\lis-tempest-ps\
+
+[compute]
+image_ref = 7c7b84db-9786-4a3b-85a7-0e986d94e559
+image_ref_alt = 7c7b84db-9786-4a3b-85a7-0e986d94e559
+floating_ip_range = 10.8.2.0/24
+floating_network_name = public
+flavor_ref = 2
+flavor_ref_alt = 2
+fixed_network_name = private
+ssh_user = centos
+image_ssh_user = centos
+image_alt_ssh_user = centos
+
+[compute-feature-enabled]
+live_migration = False
+resize = True
+vnc_console = True
+attach_encrypted_volume = False
+
+[dashboard]
+dashboard_url = http://10.8.1.57/
+
+[data-processing]
+
+[data_processing-feature-enabled]
+plugins = vanilla,cdh,mapr,spark,ambari
+
+[identity]
+username = admin
+password = Passw0rd
+tenant_name = admin
+admin_username = admin
+admin_password = Passw0rd
+admin_tenant_name = admin
+region = RegionOne
+auth_version = v2
+uri = http://10.8.1.57:5000/v2.0
+uri_v3 = http://10.8.1.57:5000/v3
+admin_domain_name = Default
+disable_ssl_certificate_validation = False
+ca_certificates_file = None
+
+[image-feature-enabled]
+deactivate_image = True
+
+[input-scenario]
+ssh_user_regex = [["^.*[Cc]entos.*$", "centos"], ["^.*[Tt]est[VvMm].*$", "centos"], ["^.*rally_verify.*$", "centos"]]
+
+[network]
+public_network_id = 726749f8-1e3a-4186-8248-9cdbc75702b9
+
+[network-feature-enabled]
+ipv6_subnet_attributes = True
+ipv6 = True
+api_extensions = dns-integration,ext-gw-mode,binding,metering,agent,subnet_allocation,l3_agent_scheduler,external-net,flavors,fwaasrouterinsertion,net-mtu,quotas,l3-ha,provider,multi-provider,vpnaas,lbaas,extraroute,lbaas_agent_scheduler,fwaas,extra_dhcp_opt,service-type,security-group,dhcp_agent_scheduler,rbac-policies,router,allowed-address-pairs,dvr
+
+[object-storage]
+operator_role = Member
+reseller_admin_role = ResellerAdmin
+
+[oslo_concurrency]
+lock_path = /home/ubuntu/tempest/virtemp/lis-tempest/tempest
+
+[orchestration]
+instance_type =
+stack_owner_role = heat_stack_owner
+stack_user_role = heat_stack_user
+
+[scenario]
+large_ops_number = 2
+#img_dir = /home/ubuntu/.rally/tempest/data
+#img_file = cirros-0.3.4-x86_64-disk.img
+
+[service_available]
+horizon = True
+ceilometer = False
+cinder = False
+glance = True
+heat = False
+ironic = False
+neutron = True
+nova = True
+sahara = False
+swift = False
+
+[validation]
+run_validation = True
+connect_method = floating
+
+[volume-feature-enabled]
+bootable = True
+

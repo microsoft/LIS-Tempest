@@ -17,7 +17,7 @@ import re
 from tempest import exceptions
 from tempest.common.utils import classloader
 from tempest.common.utils.linux import remote_client
-from tempest.openstack.common import log
+from oslo_log import log
 
 
 DEFAULT_OS_HELPER = 'tempest.common.utils.linux.remote_client.RemoteClient'

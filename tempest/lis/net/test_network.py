@@ -17,7 +17,7 @@ from tempest import config
 from tempest.common.utils import data_utils
 from tempest.common.utils.windows.remote_client import WinRemoteClient
 from tempest.lis import manager
-from tempest.openstack.common import log as logging
+from oslo_log import log as logging
 from tempest.scenario import utils as test_utils
 from tempest import test
 import pdb

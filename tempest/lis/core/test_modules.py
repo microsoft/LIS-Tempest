@@ -17,7 +17,7 @@ from tempest import config
 from tempest import exceptions
 from tempest import test
 from tempest.lis import manager
-from tempest.openstack.common import log as logging
+from oslo_log import log as logging
 from tempest.scenario import utils as test_utils
 
 CONF = config.CONF

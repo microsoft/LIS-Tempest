@@ -304,6 +304,35 @@ ComputeGroup = [
                     deprecated_group='compute-feature-enabled'),
 ]
 
+host_group = cfg.OptGroup(name='host_credentials',
+                          title='Hyper-V Host credentials')
+
+HostGroup = [
+    cfg.StrOpt('host_user_name',
+               help="Valid Hyper-V host credential "
+                    "This is a required option"),
+    cfg.StrOpt('host_password',
+               help="Valid Hyper-V host credential "
+                    "This is a required option"),
+    cfg.StrOpt('host_setupscripts_folder',
+               help="Hyper-V setupscripts folder "
+                    "This is a required option"),
+    cfg.StrOpt('host_vssbackup_drive',
+               help='Target drive for the Hyper-V VSS backups.'
+                    'This drive has to be different from the boot drive.'
+                    'This is a required option')
+]
+
+lis_group = cfg.OptGroup(name='lis',
+                         title='LIS test specific info')
+
+LisGroup = [
+    cfg.StrOpt('private_network',
+               help='Valid private network needed by some test cases'
+                    'This has to not overlap with existing openstack networks'
+                    "This is a required option")
+]
+
 compute_features_group = cfg.OptGroup(name='compute-feature-enabled',
                                       title="Enabled Compute Service Features")
 
@@ -1207,6 +1236,8 @@ DefaultGroup = [
 _opts = [
     (auth_group, AuthGroup),
     (compute_group, ComputeGroup),
+    (host_group, HostGroup),
+    (lis_group, LisGroup),
     (compute_features_group, ComputeFeaturesGroup),
     (identity_group, IdentityGroup),
     (identity_feature_group, IdentityFeatureGroup),

@@ -1529,7 +1529,7 @@ class LisBase(ScenarioTest):
         if private_key is None:
             private_key = self.keypair['private_key']
         linux_client = osutils_factory.get_os_utils(
-            ip_address=ip,
+            server=ip,
             username=username,
             pkey=private_key)
 
@@ -1547,20 +1547,20 @@ class LisBase(ScenarioTest):
             raise exc
 
     def start_vm(self, vm_id):
-        self.servers_client.start_server(vm_id)
-        waiters.wait_for_server_status(self.servers_client, vm_id, 'ACTIVE')
+        self.servers_client.start(vm_id)
+        self.servers_client.wait_for_server_status(vm_id, 'ACTIVE')
 
     def save_vm(self, vm_id):
         self.servers_client.suspend_server(vm_id)
-        waiters.wait_for_server_status(self.servers_client, vm_id, 'SUSPENDED')
+        self.servers_client.wait_for_server_status(vm_id, 'SUSPENDED')
 
     def unsave_vm(self, vm_id):
         self.servers_client.resume_server(vm_id)
-        waiters.wait_for_server_status(self.servers_client, vm_id, 'ACTIVE')
+        self.servers_client.wait_for_server_status(vm_id, 'ACTIVE')
 
     def stop_vm(self, vm_id):
-        self.servers_client.stop_server(vm_id)
-        waiters.wait_for_server_status(self.servers_client, vm_id, 'SHUTOFF')
+        self.servers_client.stop(vm_id)
+        self.servers_client.wait_for_server_status(vm_id, 'SHUTOFF')
 
     def add_disk(self, instance_name, disk_type,
                  position, vhd_type, sec_size, size='1GB'):

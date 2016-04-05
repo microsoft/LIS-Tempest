@@ -1,3 +1,5 @@
+# Copyright 2014 Cloudbase Solutions Srl
+#
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
 #    not use this file except in compliance with the License. You may obtain
 #    a copy of the License at
@@ -10,6 +12,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import os
 import netaddr
 import re
 import time
@@ -26,7 +29,7 @@ CONF = config.CONF
 LOG = logging.getLogger(__name__)
 
 
-class RemoteClient(object):
+class RemoteClientBase():
 
     def __init__(self, ip_address, username, password=None, pkey=None):
         ssh_timeout = CONF.validation.ssh_timeout
@@ -36,6 +39,17 @@ class RemoteClient(object):
                                      ssh_timeout, pkey=pkey,
                                      channel_timeout=connect_timeout)
 
+    def get_os_type(self):
+        script_name = 'get_os.sh'
+        destination = '/tmp/'
+        my_path = os.path.abspath(
+            os.path.normpath(os.path.dirname(__file__)))
+        full_script_path = my_path + '/' + script_name
+        cmd_params = []
+        distro = self.execute_script(
+            script_name, cmd_params, full_script_path, destination)
+        return distro.strip().lower()
+
     def exec_command(self, cmd):
         # Shell options below add more clearness on failures,
         # path is extended for some non-cirros guest oses (centos7)
@@ -43,12 +57,38 @@ class RemoteClient(object):
         LOG.debug("Remote command: %s" % cmd)
         return self.ssh_client.exec_command(cmd)
 
+    def copy_over(self, source, destination):
+        output = self.ssh_client.sftp(source, destination)
+        return output
+
     def validate_authentication(self):
         """Validate ssh connection and authentication
 
            This method raises an Exception when the validation fails.
         """
         self.ssh_client.test_connection_auth()
+
+    def execute_script(self, cmd, cmd_params, source, destination):
+        try:
+            self.copy_over(source, destination)
+            cmd_args = ' '.join(str(x) for x in cmd_params)
+            command = ("cd %(dest)s; chmod +x %(cmd)s; sed -i 's/\r//' %(cmd)s; "
+                       './%(cmd)s %(cmd_args)s') % {
+                'dest': destination,
+                'cmd': cmd,
+                'cmd_args': cmd_args}
+            return self.exec_command(command)
+
+        except tempest.lib.exceptions.SSHExecCommandFailed as exc:
+            LOG.exception(exc)
+            raise exc
+
+        except Exception as exc:
+            LOG.exception(exc)
+            raise exc
+
+
+class RemoteClient(RemoteClientBase):
 
     def hostname_equals_servername(self, expected_hostname):
         # Get host name using command "hostname"
@@ -191,3 +231,69 @@ class RemoteClient(object):
             cmd_why = 'sudo ls -lR /dev'
             LOG.info("Contents of /dev: %s" % self.exec_command(cmd_why))
             raise
+
+    def verify_lis_modules(self):
+        command = 'lsmod | grep hv_ | wc -l'
+        output = self.exec_command(command)
+        return int(output)
+
+    def get_cpu_count(self):
+        command = 'cat /proc/cpuinfo | grep processor | wc -l'
+        output = self.exec_command(command)
+        return int(output)
+
+    def create_file(self, file_name):
+        cmd = 'echo abc > %s' % file_name
+        return self.exec_command(cmd)
+
+    def delete_file(self, file_name):
+        cmd = 'rm -f %s' % file_name
+        output = self.exec_command(cmd)
+        return output
+
+    def verify_deamon(self, deamon):
+        cmd = 'ps cax | grep %s' % deamon
+        output = self.exec_command(cmd)
+        return output
+
+    def verify_file(self, file_name):
+        cmd = 'cat %s' % file_name
+        return self.exec_command(cmd)
+
+    def check_file_existence(self, file_name):
+        cmd = ' [ -f %s ] && echo 1 || echo 0' % file_name
+        return int(self.exec_command(cmd))
+
+    def get_unix_time(self):
+        command = 'date +%s'
+        output = self.exec_command(command)
+        return int(output)
+
+    def get_disks_count(self, sleep_count=1):
+        command = 'sleep ' + \
+            str(sleep_count) + '; fdisk -l | grep "Disk /dev/sd*" | wc -l'
+        output = self.exec_command(command)
+        return int(output)
+
+    def verify_ping(self, destination_ip, dev='eth0'):
+        cmd = "ping -I {dev} -c 10 {destination_ip}".format(
+            dev=dev, destination_ip=destination_ip)
+        return self.exec_command(cmd)
+
+
+class FedoraUtils(RemoteClient):
+
+    def get_os_type(self):
+        return 'fedora'
+
+
+class UbuntuUtils(RemoteClient):
+
+    def get_os_type(self):
+        return 'ubuntu'
+
+
+class Fedora7Utils(RemoteClient):
+
+    def get_os_type(self):
+        return 'fedora7'

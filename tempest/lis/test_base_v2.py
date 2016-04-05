@@ -13,7 +13,7 @@
 #    under the License.
 
 from tempest import config
-from tempest.openstack.common import log as logging
+from oslo_log import log as logging
 from tempest.lis import manager
 from tempest.scenario import utils as test_utils
 from tempest import test
@@ -47,7 +47,7 @@ class TestLis(manager.ScenarioTest):
             self.image_ref = CONF.compute.image_ref
         if not hasattr(self, 'flavor_ref'):
             self.flavor_ref = CONF.compute.flavor_ref
-        self.image_utils = test_utils.ImageUtils()
+        self.image_utils = test_utils.ImageUtils(self.manager)
         if not self.image_utils.is_flavor_enough(self.flavor_ref,
                                                  self.image_ref):
             raise self.skipException(
@@ -55,7 +55,7 @@ class TestLis(manager.ScenarioTest):
                     image=self.image_ref, flavor=self.flavor_ref
                 )
             )
-        self.run_ssh = CONF.compute.run_ssh and \
+        self.run_ssh = CONF.validation.run_validation and \
             self.image_utils.is_sshable_image(self.image_ref)
         self.ssh_user = self.image_utils.ssh_user(self.image_ref)
         LOG.debug('Starting test for i:{image}, f:{flavor}. '
@@ -69,13 +69,11 @@ class TestLis(manager.ScenarioTest):
     def boot_instance(self):
         # Create server with image and flavor from input scenario
         security_groups = [self.security_group]
-        create_kwargs = {
-            'key_name': self.keypair['name'],
-            'security_groups': security_groups
-        }
-        self.instance = self.create_server(image=self.image_ref,
-                                           flavor=self.flavor_ref,
-                                           create_kwargs=create_kwargs)
+	self.instance = self.create_server(flavor=self.flavor_ref,
+                                   image_id=self.image_ref,
+                                   key_name=self.keypair['name'],
+                                   security_groups=security_groups,
+                                   wait_until='ACTIVE')
 
     def verify_ssh(self):
         if self.run_ssh:
