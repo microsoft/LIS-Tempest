@@ -1547,7 +1547,7 @@ class LisBase(ScenarioTest):
     def _initiate_linux_client(self, server_or_ip, username, private_key):
         try:
             self.linux_client = self.get_remote_client(
-                server_or_ip=server_or_ip,
+                ip_address=server_or_ip,
                 username=username,
                 private_key=private_key)
         except Exception as exc:
