@@ -123,7 +123,7 @@ class Network(manager.ScenarioTest):
             # Check ssh
             try:
                 self.get_remote_client(
-                    server_or_ip=floating_ip['floatingip']['floating_ip_address'],
+                    server_or_ip=self.floating_ip['floatingip']['floating_ip_address'],
                     username=self.image_utils.ssh_user(self.image_ref),
                     private_key=self.keypair['private_key'])
             except Exception:
@@ -145,7 +145,7 @@ class Network(manager.ScenarioTest):
             # Check lis presence
             try:
                 linux_client = self.get_remote_client(
-                    server_or_ip=floating_ip['floatingip']['floating_ip_address'],
+                    server_or_ip=self.floating_ip['floatingip']['floating_ip_address'],
                     username=self.image_utils.ssh_user(self.image_ref),
                     private_key=self.keypair['private_key'])
 

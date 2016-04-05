@@ -36,7 +36,7 @@ from tempest.services.network import resources as net_resources
 import tempest.test
 
 CONF = config.CONF
-
+SUCCESS_RETURN_CODE = 0
 LOG = log.getLogger(__name__)
 
 
@@ -1518,20 +1518,29 @@ class LisBase(ScenarioTest):
             LOG.exception(exc)
             raise exc
 
-    def get_remote_client(self, server_or_ip, username=None, private_key=None):
-        if isinstance(server_or_ip, six.string_types):
-            ip = server_or_ip
-        else:
-            network_name_for_ssh = CONF.compute.network_for_ssh
-            ip = server_or_ip.networks[network_name_for_ssh][0]
+    def get_remote_client(self, ip_address, username=None, private_key=None):
+        """Get a SSH client to a remote server
+
+        @param ip_address the server floating or fixed IP address to use
+                          for ssh validation
+        @param username name of the Linux account on the remote server
+        @param private_key the SSH private key to use
+        @return a RemoteClient object
+        """
+
         if username is None:
-            username = CONF.scenario.ssh_user
-        if private_key is None:
-            private_key = self.keypair['private_key']
-        linux_client = osutils_factory.get_os_utils(
-            ip_address=ip,
-            username=username,
-            pkey=private_key)
+            username = CONF.validation.image_ssh_user
+        # Set this with 'keypair' or others to log in with keypair or
+        # username/password.
+        if CONF.validation.auth_method == 'keypair':
+            password = None
+            if private_key is None:
+                private_key = self.keypair['private_key']
+        else:
+            password = CONF.validation.image_ssh_password
+            private_key = None
+        linux_client = osutils_factory.get_os_utils(ip_address, username,
+                                                  pkey=private_key)
 
         return linux_client
 
