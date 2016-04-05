@@ -69,11 +69,11 @@ class TestLis(manager.ScenarioTest):
     def boot_instance(self):
         # Create server with image and flavor from input scenario
         security_groups = [self.security_group]
-	self.instance = self.create_server(flavor=self.flavor_ref,
-                                   image_id=self.image_ref,
-                                   key_name=self.keypair['name'],
-                                   security_groups=security_groups,
-                                   wait_until='ACTIVE')
+      	self.instance = self.create_server(flavor=self.flavor_ref,
+                                           image_id=self.image_ref,
+                                           key_name=self.keypair['name'],
+                                           security_groups=security_groups,
+                                           wait_until='ACTIVE')
 
     def verify_ssh(self):
         if self.run_ssh:

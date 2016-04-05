@@ -57,27 +57,27 @@ class ISS(manager.LisBase):
 
     def boot_instance(self):
 	# Create server with image and flavor from input scenario
-	security_groups = [self.security_group]
-	self.instance = self.create_server(flavor=self.flavor_ref,
-        	                   image_id=self.image_ref,
-                	           key_name=self.keypair['name'],
-                        	   security_groups=security_groups,
-                           	   wait_until='ACTIVE')
+    	security_groups = [self.security_group]
+    	self.instance = self.create_server(flavor=self.flavor_ref,
+                    	                   image_id=self.image_ref,
+                            	           key_name=self.keypair['name'],
+                                    	   security_groups=security_groups,
+                                       	   wait_until='ACTIVE')
         self.instance_name = self.instance["OS-EXT-SRV-ATTR:instance_name"]
         self.host_name = self.instance["OS-EXT-SRV-ATTR:hypervisor_hostname"]
         self._initiate_host_client(self.host_name)
 
     def nova_floating_ip_create(self):
-	floating_network_id = CONF.network.public_network_id
-	self.floating_ip = self.floating_ips_client.create_floatingip(floating_network_id=floating_network_id)
-	self.addCleanup(self.delete_wrapper,
-        	self.floating_ips_client.delete_floatingip,
-        	self.floating_ip['floatingip']['floating_ip_address'])
+    	floating_network_id = CONF.network.public_network_id
+    	self.floating_ip = self.floating_ips_client.create_floatingip(floating_network_id=floating_network_id)
+    	self.addCleanup(self.delete_wrapper,
+            	self.floating_ips_client.delete_floatingip,
+            	self.floating_ip['floatingip']['floating_ip_address'])
 
     def nova_floating_ip_add(self):
-	self.compute_floating_ips_client.associate_floating_ip_to_server(
-	self.floating_ip['floatingip']['floating_ip_address'], self.instance['id'])
-    
+    	self.compute_floating_ips_client.associate_floating_ip_to_server(
+    	   self.floating_ip['floatingip']['floating_ip_address'], self.instance['id'])
+
     def spawn_vm(self):
         self.add_keypair()
         self.security_group = self._create_security_group()

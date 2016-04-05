@@ -80,13 +80,11 @@ class Network(manager.ScenarioTest):
     def boot_instance(self):
         # Create server with image and flavor from input scenario
         security_groups = [self.security_group]
-        create_kwargs = {
-            'key_name': self.keypair['name'],
-            'security_groups': security_groups
-        }
-        self.instance = self.create_server(image=self.image_ref,
-                                           flavor=self.flavor_ref,
-                                           create_kwargs=create_kwargs)
+    	self.instance = self.create_server(flavor=self.flavor_ref,
+                    	                   image_id=self.image_ref,
+                            	           key_name=self.keypair['name'],
+                                    	   security_groups=security_groups,
+                                       	   wait_until='ACTIVE')
         self.instance_name = self.instance["OS-EXT-SRV-ATTR:instance_name"]
         self.host_name = self.instance["OS-EXT-SRV-ATTR:hypervisor_hostname"]
         self._initiate_wsman(self.host_name)
@@ -107,8 +105,8 @@ class Network(manager.ScenarioTest):
                         self.floating_ip['id'])
 
     def nova_floating_ip_add(self):
-        self.floating_ips_client.associate_floating_ip_to_server(
-            self.floating_ip['ip'], self.instance['id'])
+    	self.compute_floating_ips_client.associate_floating_ip_to_server(
+    	   self.floating_ip['floatingip']['floating_ip_address'], self.instance['id'])
 
     def verify_ssh(self):
         if self.run_ssh:

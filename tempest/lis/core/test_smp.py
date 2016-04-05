@@ -67,15 +67,15 @@ class ISS(manager.LisBase):
         self._initiate_host_client(self.host_name)
 
     def nova_floating_ip_create(self):
-	floating_network_id = CONF.network.public_network_id
-	self.floating_ip = self.floating_ips_client.create_floatingip(floating_network_id=floating_network_id)
-	self.addCleanup(self.delete_wrapper,
-                self.floating_ips_client.delete_floatingip,
-                self.floating_ip['floatingip']['floating_ip_address'])
+    	floating_network_id = CONF.network.public_network_id
+    	self.floating_ip = self.floating_ips_client.create_floatingip(floating_network_id=floating_network_id)
+    	self.addCleanup(self.delete_wrapper,
+                    self.floating_ips_client.delete_floatingip,
+                    self.floating_ip['floatingip']['floating_ip_address'])
 
     def nova_floating_ip_add(self):
-	self.compute_floating_ips_client.associate_floating_ip_to_server(
-    	self.floating_ip['floatingip']['floating_ip_address'], self.instance['id'])
+    	self.compute_floating_ips_client.associate_floating_ip_to_server(
+        	self.floating_ip['floatingip']['floating_ip_address'], self.instance['id'])
 
     def spawn_vm(self):
         self.add_keypair()

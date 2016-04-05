@@ -61,7 +61,7 @@ class StorageBase(manager.LisBase):
         self.disk_type = 'vhd'
         self.run_ssh = CONF.compute.run_ssh and \
             self.image_utils.is_sshable_image(self.image_ref)
-        self.ssh_user = CONF.compute.ssh_user
+        self.ssh_user = CONF.validation.image_ssh_user
 
         LOG.debug('Starting test for i:{image}, f:{flavor}. '
                   'Run ssh: {ssh}, user: {ssh_user}'.format(
@@ -74,26 +74,25 @@ class StorageBase(manager.LisBase):
     def boot_instance(self):
         # Create server with image and flavor from input scenario
         security_groups = [self.security_group]
-        create_kwargs = {
-            'key_name': self.keypair['name'],
-            'security_groups': security_groups
-        }
-        self.instance = self.create_server(image=self.image_ref,
-                                           flavor=self.flavor_ref,
-                                           create_kwargs=create_kwargs)
+    	self.instance = self.create_server(flavor=self.flavor_ref,
+                    	                   image_id=self.image_ref,
+                            	           key_name=self.keypair['name'],
+                                    	   security_groups=security_groups,
+                                       	   wait_until='ACTIVE')
         self.instance_name = self.instance["OS-EXT-SRV-ATTR:instance_name"]
         self.host_name = self.instance["OS-EXT-SRV-ATTR:hypervisor_hostname"]
         self._initiate_host_client(self.host_name)
 
     def nova_floating_ip_create(self):
-        _, self.floating_ip = self.floating_ips_client.create_floating_ip("public")
-        self.addCleanup(self.delete_wrapper,
-                        self.floating_ips_client.delete_floating_ip,
-                        self.floating_ip['id'])
+    	floating_network_id = CONF.network.public_network_id
+    	self.floating_ip = self.floating_ips_client.create_floatingip(floating_network_id=floating_network_id)
+    	self.addCleanup(self.delete_wrapper,
+            	self.floating_ips_client.delete_floatingip,
+            	self.floating_ip['floatingip']['floating_ip_address'])
 
     def nova_floating_ip_add(self):
-        self.floating_ips_client.associate_floating_ip_to_server(
-            self.floating_ip['ip'], self.instance['id'])
+    	self.compute_floating_ips_client.associate_floating_ip_to_server(
+    	   self.floating_ip['floatingip']['floating_ip_address'], self.instance['id'])
 
     def spawn_vm(self):
         self.add_keypair()
@@ -115,7 +114,7 @@ class StorageBase(manager.LisBase):
                           pos, vhd_type, self.sector_size)
         self.start_vm(self.server_id)
 
-        self._initiate_linux_client(self.floating_ip['ip'],
+        self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
                                     self.ssh_user, self.keypair['private_key'])
         self.format_disk(exc_dsk_cnt, filesystem)
         self.servers_client.delete_server(self.instance['id'])
@@ -132,7 +131,7 @@ class StorageBase(manager.LisBase):
                           pos, vhd_type, self.sector_size, size)
         self.start_vm(self.server_id)
 
-        self._initiate_linux_client(self.floating_ip['ip'],
+        self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
                                     self.ssh_user, self.keypair['private_key'])
         self.format_disk(exc_dsk_cnt, filesystem)
         self.servers_client.delete_server(self.instance['id'])
@@ -147,7 +146,7 @@ class StorageBase(manager.LisBase):
             self.disks.append(disk)
 
         self.start_vm(self.server_id)
-        self._initiate_linux_client(self.floating_ip['ip'],
+        self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
                                     self.ssh_user, self.keypair['private_key'])
         try:
             self.format_disk(exc_dsk_cnt, filesystem)
@@ -170,7 +169,7 @@ class StorageBase(manager.LisBase):
             disk = self.add_passthrough_disk(dev)
             self.disks.append(disk)
 
-        self._initiate_linux_client(self.floating_ip['ip'],
+        self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
                                     self.ssh_user, self.keypair['private_key'])
         try:
             self.format_disk(exc_dsk_cnt, filesystem)
@@ -192,7 +191,7 @@ class StorageBase(manager.LisBase):
             disk = self.add_passthrough_disk(dev)
             self.disks.append(disk)
         self.start_vm(self.server_id)
-        self._initiate_linux_client(self.floating_ip['ip'],
+        self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
                                     self.ssh_user, self.keypair['private_key'])
         try:
             for disk in self.disks:
@@ -223,7 +222,7 @@ class StorageBase(manager.LisBase):
             self.add_disk(self.instance_name, self.disk_type,
                           pos, vhd_type, self.sector_size)
 
-        self._initiate_linux_client(self.floating_ip['ip'],
+        self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
                                     self.ssh_user, self.keypair['private_key'])
         self.format_disk(exc_dsk_cnt, filesystem)
         self.servers_client.delete_server(self.instance['id'])
@@ -240,7 +239,7 @@ class StorageBase(manager.LisBase):
                           pos, vhd_type, self.sector_size)
         self.start_vm(self.server_id)
 
-        self._initiate_linux_client(self.floating_ip['ip'],
+        self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
                                     self.ssh_user, self.keypair['private_key'])
         for disk in self.disks:
             self.detach_disk(self.instance_name, disk)
@@ -260,7 +259,7 @@ class StorageBase(manager.LisBase):
             self.add_disk(self.instance_name, self.disk_type,
                           pos, vhd_type, self.sector_size)
 
-        self._initiate_linux_client(self.floating_ip['ip'],
+        self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
                                     self.ssh_user, self.keypair['private_key'])
         self.format_disk(exc_dsk_cnt, filesystem)
 
@@ -273,7 +272,7 @@ class StorageBase(manager.LisBase):
     def _test_hot_swap_smp(self, pos, vhd_type, exc_dsk_cnt, filesystem):
         self.spawn_vm()
         self.servers_client.wait_for_server_status(self.server_id, 'ACTIVE')
-        self._initiate_linux_client(self.floating_ip['ip'],
+        self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
                                     self.ssh_user, self.keypair['private_key'])
         vcpu_count = self.linux_client.get_number_of_vcpus()
         if vcpu_count < 2:
@@ -310,7 +309,7 @@ class StorageBase(manager.LisBase):
         else:
             self.add_pass_disk(self.instance_name, pos)
         self.start_vm(self.server_id)
-        self._initiate_linux_client(self.floating_ip['ip'],
+        self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
                                     self.ssh_user, self.keypair['private_key'])
         self.format_disk(exc_dsk_cnt, filesystem)
         self.servers_client.delete_server(self.instance['id'])
@@ -324,7 +323,7 @@ class StorageBase(manager.LisBase):
         else:
             self.add_pass_disk(self.instance_name, pos)
         self.start_vm(self.server_id)
-        self._initiate_linux_client(self.floating_ip['ip'],
+        self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
                                     self.ssh_user, self.keypair['private_key'])
         self.format_disk(exc_dsk_cnt, filesystem)
         for disk in self.disks:
@@ -338,7 +337,7 @@ class StorageBase(manager.LisBase):
         self.stop_vm(self.server_id)
         self.add_diff_disk(self.instance_name, pos, self.disk_type)
         self.start_vm(self.server_id)
-        self._initiate_linux_client(self.floating_ip['ip'],
+        self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
                                     self.ssh_user, self.keypair['private_key'])
         initial_disk_size = self.get_parent_disk_size(self.disks[0])
         self.increase_disk_size()
@@ -358,7 +357,7 @@ class StorageBase(manager.LisBase):
         self.take_snapshot(self.instance_name, 'before_file')
         self.start_vm(self.server_id)
 
-        self._initiate_linux_client(self.floating_ip['ip'],
+        self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
                                     self.ssh_user, self.keypair['private_key'])
         self.linux_client.create_file('snapshot_test')
         self.stop_vm(self.server_id)
@@ -487,7 +486,7 @@ class Storage(StorageBase):
     def test_iso(self):
         self.spawn_vm()
         self.servers_client.wait_for_server_status(self.server_id, 'ACTIVE')
-        self._initiate_linux_client(self.floating_ip['ip'],
+        self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
                                     self.ssh_user, self.keypair['private_key'])
         self.check_iso()
         self.servers_client.delete_server(self.instance['id'])
@@ -499,7 +498,7 @@ class Storage(StorageBase):
         self.stop_vm(self.server_id)
         self.add_floppy_disk(self.instance_name)
         self.start_vm(self.server_id)
-        self._initiate_linux_client(self.floating_ip['ip'],
+        self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
                                     self.ssh_user, self.keypair['private_key'])
         self.check_floppy()
         self.servers_client.delete_server(self.instance['id'])
@@ -509,7 +508,7 @@ class Storage(StorageBase):
     def test_export_import(self):
         self.spawn_vm()
         self.servers_client.wait_for_server_status(self.server_id, 'ACTIVE')
-        self._initiate_linux_client(self.floating_ip['ip'],
+        self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
                                     self.ssh_user, self.keypair['private_key'])
         self.export_import(self.instance_name)
         self.servers_client.delete_server(self.instance['id'])
