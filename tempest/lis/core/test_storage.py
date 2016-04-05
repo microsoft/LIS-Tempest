@@ -59,7 +59,7 @@ class StorageBase(manager.LisBase):
         self.sector_size = 512
         self.disks = []
         self.disk_type = 'vhd'
-        self.run_ssh = CONF.compute.run_ssh and \
+        self.run_ssh = CONF.validation.run_validation and \
             self.image_utils.is_sshable_image(self.image_ref)
         self.ssh_user = CONF.validation.image_ssh_user
 

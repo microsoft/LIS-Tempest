@@ -53,7 +53,7 @@ class TimeSync(manager.LisBase):
             )
         self.host_name = ""
         self.instance_name = ""
-        self.run_ssh = CONF.compute.run_ssh and \
+        self.run_ssh = CONF.validation.run_validation and \
             self.image_utils.is_sshable_image(self.image_ref)
         self.ssh_user = CONF.validation.image_ssh_user
         LOG.debug('Starting test for i:{image}, f:{flavor}. '

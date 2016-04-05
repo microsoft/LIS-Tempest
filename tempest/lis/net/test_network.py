@@ -61,7 +61,7 @@ class Network(manager.ScenarioTest):
             )
         self.host_name = ""
         self.instance_name = ""
-        self.run_ssh = CONF.compute.run_ssh and \
+        self.run_ssh = CONF.validation.run_validation and \
             self.image_utils.is_sshable_image(self.image_ref)
         self.ssh_user = self.image_utils.ssh_user(self.image_ref)
         self.host_username = CONF.host_credentials.host_user_name
