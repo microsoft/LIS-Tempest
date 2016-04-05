@@ -19,6 +19,8 @@ host_password = Passw0rd
 host_setupscripts_folder = C:\lis-tempest-ps\
 
 [compute]
+floating_network_name = public
+run_ssh = False
 image_ref = 7c7b84db-9786-4a3b-85a7-0e986d94e559
 image_ref_alt = 7c7b84db-9786-4a3b-85a7-0e986d94e559
 floating_ip_range = 10.8.2.0/24
@@ -67,6 +69,7 @@ ssh_user_regex = [["^.*[Cc]entos.*$", "centos"], ["^.*[Tt]est[VvMm].*$", "centos
 
 [network]
 public_network_id = 726749f8-1e3a-4186-8248-9cdbc75702b9
+floating_network_name = public
 
 [network-feature-enabled]
 ipv6_subnet_attributes = True
@@ -78,7 +81,7 @@ operator_role = Member
 reseller_admin_role = ResellerAdmin
 
 [oslo_concurrency]
-lock_path = /home/ubuntu/tempest/virtemp/lis-tempest/tempest
+lock_path = /home/ubuntu/tempest/upvir/lis-tempest/tempest
 
 [orchestration]
 instance_type =
@@ -105,6 +108,8 @@ swift = False
 [validation]
 run_validation = True
 connect_method = floating
+image_ssh_user = centos
+ssh_timeout = 300
 
 [volume-feature-enabled]
 bootable = True
