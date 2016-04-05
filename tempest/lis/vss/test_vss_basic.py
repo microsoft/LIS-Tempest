@@ -87,10 +87,11 @@ class TestLis(manager.ScenarioTest):
         self.host_name = self.instance["OS-EXT-SRV-ATTR:hypervisor_hostname"]
 
     def nova_floating_ip_create(self):
-        _, self.floating_ip = self.floating_ips_client.create_floating_ip()
+        floating_network_id = CONF.network.public_network_id
+        self.floating_ip = self.floating_ips_client.create_floatingip(floating_network_id=floating_network_id)
         self.addCleanup(self.delete_wrapper,
-                        self.floating_ips_client.delete_floating_ip,
-                        self.floating_ip['id'])
+                self.floating_ips_client.delete_floatingip,
+                self.floating_ip['floatingip']['floating_ip_address'])
 
     def nova_floating_ip_add(self):
     	self.compute_floating_ips_client.associate_floating_ip_to_server(
@@ -100,7 +101,7 @@ class TestLis(manager.ScenarioTest):
         """ Check if hv_vss_deamon runs on the vm """
         try:
             linux_client = self.get_remote_client(
-                server_or_ip=self.floating_ip['ip'],
+                server_or_ip=self.floating_ip['floatingip']['floating_ip_address'],
                 username=self.image_utils.ssh_user(self.image_ref),
                 private_key=self.keypair['private_key'])
             linux_client.create_file(self.filename)
@@ -116,7 +117,7 @@ class TestLis(manager.ScenarioTest):
         """ Create a file on the vm """
         try:
             linux_client = self.get_remote_client(
-                server_or_ip=self.floating_ip['ip'],
+                server_or_ip=self.floating_ip['floatingip']['floating_ip_address'],
                 username=self.image_utils.ssh_user(self.image_ref),
                 private_key=self.keypair['private_key'])
             linux_client.create_file(self.filename)
@@ -154,7 +155,7 @@ class TestLis(manager.ScenarioTest):
         """ Delete the file from the vm """
         try:
             linux_client = self.get_remote_client(
-                server_or_ip=self.floating_ip['ip'],
+                server_or_ip=self.floating_ip['floatingip']['floating_ip_address'],
                 username=self.image_utils.ssh_user(self.image_ref),
                 private_key=self.keypair['private_key'])
             linux_client.delete_file(self.filename)
@@ -191,7 +192,7 @@ class TestLis(manager.ScenarioTest):
         """ Verify if the file exists on the vm """
         try:
             linux_client = self.get_remote_client(
-                server_or_ip=self.floating_ip['ip'],
+                server_or_ip=self.floating_ip['floatingip']['floating_ip_address'],
                 username=self.image_utils.ssh_user(self.image_ref),
                 private_key=self.keypair['private_key'])
             output = linux_client.verify_file(self.filename)

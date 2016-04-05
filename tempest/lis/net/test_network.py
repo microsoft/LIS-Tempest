@@ -99,10 +99,11 @@ class Network(manager.ScenarioTest):
             raise exc
 
     def nova_floating_ip_create(self):
-        _, self.floating_ip = self.floating_ips_client.create_floating_ip()
+        floating_network_id = CONF.network.public_network_id
+        self.floating_ip = self.floating_ips_client.create_floatingip(floating_network_id=floating_network_id)
         self.addCleanup(self.delete_wrapper,
-                        self.floating_ips_client.delete_floating_ip,
-                        self.floating_ip['id'])
+                self.floating_ips_client.delete_floatingip,
+                self.floating_ip['floatingip']['floating_ip_address'])
 
     def nova_floating_ip_add(self):
     	self.compute_floating_ips_client.associate_floating_ip_to_server(
@@ -111,17 +112,18 @@ class Network(manager.ScenarioTest):
     def verify_ssh(self):
         if self.run_ssh:
             # Obtain a floating IP
-            _, floating_ip = self.floating_ips_client.create_floating_ip()
+            floating_network_id = CONF.network.public_network_id
+            self.floating_ip = self.floating_ips_client.create_floatingip(floating_network_id=floating_network_id)
             self.addCleanup(self.delete_wrapper,
-                            self.floating_ips_client.delete_floating_ip,
-                            floating_ip['id'])
+                    self.floating_ips_client.delete_floatingip,
+                    self.floating_ip['floatingip']['floating_ip_address'])
             # Attach a floating IP
-            self.floating_ips_client.associate_floating_ip_to_server(
-                floating_ip['ip'], self.instance['id'])
+            self.compute_floating_ips_client.associate_floating_ip_to_server(
+                self.floating_ip['floatingip']['floating_ip_address'], self.instance['id'])
             # Check ssh
             try:
                 self.get_remote_client(
-                    server_or_ip=floating_ip['ip'],
+                    server_or_ip=floating_ip['floatingip']['floating_ip_address'],
                     username=self.image_utils.ssh_user(self.image_ref),
                     private_key=self.keypair['private_key'])
             except Exception:
@@ -132,17 +134,18 @@ class Network(manager.ScenarioTest):
     def verify_external_ping(self, destination_ip):
         if self.run_ssh:
             # Obtain a floating IP
-            _, floating_ip = self.floating_ips_client.create_floating_ip()
+            floating_network_id = CONF.network.public_network_id
+            self.floating_ip = self.floating_ips_client.create_floatingip(floating_network_id=floating_network_id)
             self.addCleanup(self.delete_wrapper,
-                            self.floating_ips_client.delete_floating_ip,
-                            floating_ip['id'])
+                    self.floating_ips_client.delete_floatingip,
+                    self.floating_ip['floatingip']['floating_ip_address'])
             # Attach a floating IP
-            self.floating_ips_client.associate_floating_ip_to_server(
-                floating_ip['ip'], self.instance['id'])
+            self.compute_floating_ips_client.associate_floating_ip_to_server(
+                self.floating_ip['floatingip']['floating_ip_address'], self.instance['id'])
             # Check lis presence
             try:
                 linux_client = self.get_remote_client(
-                    server_or_ip=floating_ip['ip'],
+                    server_or_ip=floating_ip['floatingip']['floating_ip_address'],
                     username=self.image_utils.ssh_user(self.image_ref),
                     private_key=self.keypair['private_key'])
 
