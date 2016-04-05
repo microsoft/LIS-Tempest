@@ -4,8 +4,12 @@ log_file = tempest.log
 use_stderr = False
 
 [auth]
-use_dynamic_credentials = False
-test_accounts_file = /home/ubuntu/tempest/upvir/lis-tempest/etc/accounts.yaml
+use_dynamic_credentials = True
+admin_username = admin
+admin_tenant_name = admin
+admin_password = Passw0rd
+create_isolated_networks = false
+tempest_roles = Admin
 
 [boto]
 http_socket_timeout = 30
@@ -70,6 +74,7 @@ ssh_user_regex = [["^.*[Cc]entos.*$", "centos"], ["^.*[Tt]est[VvMm].*$", "centos
 [network]
 public_network_id = 726749f8-1e3a-4186-8248-9cdbc75702b9
 floating_network_name = public
+tenant_networks_reachable = false
 
 [network-feature-enabled]
 ipv6_subnet_attributes = True
