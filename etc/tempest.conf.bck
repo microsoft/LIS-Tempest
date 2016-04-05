@@ -15,7 +15,6 @@ tempest_roles = Admin
 http_socket_timeout = 30
 ec2_url = None
 s3_url = None
-s3_materials_path = /home/ubuntu/.rally/tempest/data/s3materials
 
 [host_credentials]
 host_user_name = zdudas
