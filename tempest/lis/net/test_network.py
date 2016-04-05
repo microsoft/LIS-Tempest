@@ -123,7 +123,7 @@ class Network(manager.ScenarioTest):
             # Check ssh
             try:
                 self.get_remote_client(
-                    server_or_ip=self.floating_ip['floatingip']['floating_ip_address'],
+                    ip_address=self.floating_ip['floatingip']['floating_ip_address'],
                     username=self.image_utils.ssh_user(self.image_ref),
                     private_key=self.keypair['private_key'])
             except Exception:
@@ -145,7 +145,7 @@ class Network(manager.ScenarioTest):
             # Check lis presence
             try:
                 linux_client = self.get_remote_client(
-                    server_or_ip=self.floating_ip['floatingip']['floating_ip_address'],
+                    ip_address=self.floating_ip['floatingip']['floating_ip_address'],
                     username=self.image_utils.ssh_user(self.image_ref),
                     private_key=self.keypair['private_key'])
 
@@ -291,7 +291,7 @@ class Bridge(Network):
     def _set_bridge(self, vm, static_ip, netmask, dev1, dev2):
         try:
             linux_client = self.get_remote_client(
-                server_or_ip=vm['floating_ip']['ip'],
+                ip_address=vm['floating_ip']['ip'],
                 username=self.image_utils.ssh_user(self.image_ref),
                 private_key=self.keypair['private_key'])
             script = 'SetBridge.sh'
@@ -322,7 +322,7 @@ class Bridge(Network):
     def _set_interfaces(self, vm, static_ip, netmask, device):
         try:
             linux_client = self.get_remote_client(
-                server_or_ip=vm['floating_ip']['ip'],
+                ip_address=vm['floating_ip']['ip'],
                 username=self.image_utils.ssh_user(self.image_ref),
                 private_key=self.keypair['private_key'])
             script = 'SetStaticIp.sh'
@@ -358,7 +358,7 @@ class Bridge(Network):
     def _test_ping(self, vm, device, target):
         try:
             linux_client = self.get_remote_client(
-                server_or_ip=vm['floating_ip']['ip'],
+                ip_address=vm['floating_ip']['ip'],
                 username=self.image_utils.ssh_user(self.image_ref),
                 private_key=self.keypair['private_key'])
 
