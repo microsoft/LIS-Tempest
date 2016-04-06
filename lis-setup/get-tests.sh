@@ -18,11 +18,11 @@ array_to_regex()
 
 tests_dir=$1
 
-exclude_tests_file="excluded-tests.txt"
-include_tests_file="included-tests.txt"
+exclude_tests_file="lis-setup/excluded-tests.txt"
+include_tests_file="lis-setup/included-tests.txt"
 #isolated_tests_file="isolated-tests.txt"
 
-if [ -f "$include_tests_file" ]; then 
+if [ -f "$include_tests_file" ]; then
     include_tests=(`awk 'NF && $1!~/^#/' $include_tests_file`)
 fi
 
