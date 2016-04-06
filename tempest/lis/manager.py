@@ -16,7 +16,7 @@
 #    under the License.
 
 import subprocess
-
+import os
 import netaddr
 from oslo_log import log
 from oslo_serialization import jsonutils as json
