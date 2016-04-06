@@ -25,15 +25,12 @@ host_setupscripts_folder = C:\lis-tempest-ps\
 floating_network_name = public
 run_ssh = False
 image_ref = 7c7b84db-9786-4a3b-85a7-0e986d94e559
-image_ref_alt = 7c7b84db-9786-4a3b-85a7-0e986d94e559
 floating_ip_range = 10.8.2.0/24
 floating_network_name = public
 flavor_ref = 2
 flavor_ref_alt = 2
 fixed_network_name = private
-ssh_user = centos
 image_ssh_user = centos
-image_alt_ssh_user = centos
 
 [compute-feature-enabled]
 live_migration = False
@@ -67,9 +64,6 @@ ca_certificates_file = None
 [image-feature-enabled]
 deactivate_image = True
 
-[input-scenario]
-ssh_user_regex = [["^.*[Cc]entos.*$", "centos"], ["^.*[Tt]est[VvMm].*$", "centos"], ["^.*rally_verify.*$", "centos"]]
-
 [network]
 public_network_id = 726749f8-1e3a-4186-8248-9cdbc75702b9
 floating_network_name = public
@@ -94,8 +88,6 @@ stack_user_role = heat_stack_user
 
 [scenario]
 large_ops_number = 2
-#img_dir = /home/ubuntu/.rally/tempest/data
-#img_file = cirros-0.3.4-x86_64-disk.img
 
 [service_available]
 horizon = True

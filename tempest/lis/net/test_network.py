@@ -150,7 +150,7 @@ class Network(manager.ScenarioTest):
                     private_key=self.keypair['private_key'])
 
                 output = linux_client.verify_ping(destination_ip)
-                LOG.info('Ping resuls', output)
+                LOG.info('Ping resuls ${0}'.format(output))
                 self.assertNotEqual(0, output)
             except Exception:
                 LOG.exception('ssh to server failed')
@@ -217,15 +217,15 @@ class Bridge(Network):
             raise exc
 
     def nova_floating_ip_create(self):
-        _, floating_ip = self.floating_ips_client.create_floating_ip()
+        floating_network_id = CONF.network.public_network_id
+        self.floating_ip = self.floating_ips_client.create_floatingip(floating_network_id=floating_network_id)
         self.addCleanup(self.delete_wrapper,
-                        self.floating_ips_client.delete_floating_ip,
-                        floating_ip['id'])
-        return floating_ip
+                self.floating_ips_client.delete_floatingip,
+                self.floating_ip['floatingip']['floating_ip_address'])
 
-    def nova_floating_ip_add(self, floating_ip, instance):
-        self.floating_ips_client.associate_floating_ip_to_server(
-            floating_ip['ip'], instance['id'])
+    def nova_floating_ip_add(self):
+        self.compute_floating_ips_client.associate_floating_ip_to_server(
+           self.floating_ip['floatingip']['floating_ip_address'], self.instance['id'])
 
     def send_command(self, cmd):
 
@@ -363,7 +363,7 @@ class Bridge(Network):
                 private_key=self.keypair['private_key'])
 
             output = linux_client.verify_ping(target, device)
-            LOG.info('Ping result %s', output)
+            LOG.info('Ping result ${0}'.format(output))
             self.assertNotEqual(0, output)
 
         except Exception as exc:

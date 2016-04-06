@@ -106,7 +106,7 @@ class TestLis(manager.ScenarioTest):
                 private_key=self.keypair['private_key'])
             linux_client.create_file(self.filename)
             output = linux_client.verify_deamon(self.deamon)
-            LOG.info('VSS Deamon is running ', str(output))
+            LOG.info('VSS Deamon is running ${0}'.format(output))
             self.assertIsNotNone(output)
         except Exception:
             LOG.exception('VSS Deamon ' + self.deamon + ' is not running!')
@@ -196,7 +196,7 @@ class TestLis(manager.ScenarioTest):
                 username=self.image_utils.ssh_user(self.image_ref),
                 private_key=self.keypair['private_key'])
             output = linux_client.verify_file(self.filename)
-            LOG.info('File is present on the VM. ', output)
+            LOG.info('File is present on the VM. ${0}'.format(output))
             self.assertIsNotNone(output)
         except Exception:
             LOG.exception('File ' + self.filename + 'is NOT on the VM!')
