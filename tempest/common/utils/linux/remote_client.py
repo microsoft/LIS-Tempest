@@ -293,6 +293,12 @@ class UbuntuUtils(RemoteClient):
         return 'ubuntu'
 
 
+class DebianUtils(RemoteClient):
+
+    def get_os_type(self):
+        return 'ubuntu'
+
+
 class Fedora7Utils(RemoteClient):
 
     def get_os_type(self):
