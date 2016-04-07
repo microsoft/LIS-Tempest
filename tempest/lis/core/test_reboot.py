@@ -104,7 +104,7 @@ class Reboot(manager.LisBase):
         for memory in mem_settings:
             new_flavor = self.create_flavor(memory)
             self.servers_client.resize(self.server_id, new_flavor)
-            self.waiters.wait_for_server_status(self.server_id,
+            waiters.wait_for_server_status(self.servers_client, self.server_id,
                                                        'VERIFY_RESIZE')
             self.servers_client.confirm_resize(self.server_id)
             self.servers_client.reboot(self.server_id, 'SOFT')
