@@ -50,7 +50,7 @@ def get_os_utils(**kvargs):
     linux_client = remote_client.RemoteClientBase(**kvargs)
     try:
         linux_client.validate_authentication()
-    except exceptions.SSHTimeout:
+    except lib.exceptions.SSHTimeout:
         LOG.exception('ssh connection failed')
         raise
     distro = linux_client.get_os_type()
