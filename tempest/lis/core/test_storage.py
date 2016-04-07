@@ -162,7 +162,7 @@ class StorageBase(manager.LisBase):
 
     def _test_hot_add_passthrough(self, count, exc_dsk_cnt, filesystem):
         self.spawn_vm()
-        self.servers_client.wait_for_server_status(self.server_id, 'ACTIVE')
+        self.waiters.wait_for_server_status(self.server_id, 'ACTIVE')
         self.disks = []
 
         for dev in count:
@@ -212,7 +212,7 @@ class StorageBase(manager.LisBase):
         self.nova_floating_ip_create()
         self.nova_floating_ip_add()
         server_id = self.instance['id']
-        self.servers_client.wait_for_server_status(server_id, 'ACTIVE')
+        self.waiters.wait_for_server_status(server_id, 'ACTIVE')
 
         if isinstance(pos, list):
             for position in pos:
@@ -249,7 +249,7 @@ class StorageBase(manager.LisBase):
 
     def _test_hot_swap(self, pos, vhd_type, exc_dsk_cnt, filesystem):
         self.spawn_vm()
-        self.servers_client.wait_for_server_status(self.server_id, 'ACTIVE')
+        self.waiters.wait_for_server_status(self.server_id, 'ACTIVE')
 
         if isinstance(pos, list):
             for position in pos:
@@ -271,17 +271,17 @@ class StorageBase(manager.LisBase):
 
     def _test_hot_swap_smp(self, pos, vhd_type, exc_dsk_cnt, filesystem):
         self.spawn_vm()
-        self.servers_client.wait_for_server_status(self.server_id, 'ACTIVE')
+        self.waiters.wait_for_server_status(self.server_id, 'ACTIVE')
         self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
                                     self.ssh_user, self.keypair['private_key'])
         vcpu_count = self.linux_client.get_number_of_vcpus()
         if vcpu_count < 2:
             self.servers_client.stop(self.server_id)
-            self.servers_client.wait_for_server_status(
+            self.waiters.wait_for_server_status(
                 self.server_id, 'SHUTOFF')
             self.change_cpu(self.instance_name, 4)
             self.servers_client.start(self.server_id)
-            self.servers_client.wait_for_server_status(
+            self.waiters.wait_for_server_status(
                 self.server_id, 'ACTIVE')
 
         if isinstance(pos, list):
@@ -485,7 +485,7 @@ class Storage(StorageBase):
     @test.services('compute', 'network')
     def test_iso(self):
         self.spawn_vm()
-        self.servers_client.wait_for_server_status(self.server_id, 'ACTIVE')
+        self.waiters.wait_for_server_status(self.server_id, 'ACTIVE')
         self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
                                     self.ssh_user, self.keypair['private_key'])
         self.check_iso()
@@ -507,7 +507,7 @@ class Storage(StorageBase):
     @test.services('compute', 'network')
     def test_export_import(self):
         self.spawn_vm()
-        self.servers_client.wait_for_server_status(self.server_id, 'ACTIVE')
+        self.waiters.wait_for_server_status(self.server_id, 'ACTIVE')
         self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
                                     self.ssh_user, self.keypair['private_key'])
         self.export_import(self.instance_name)
