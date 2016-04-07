@@ -31,7 +31,7 @@ CONF = config.CONF
 LOG = logging.getLogger(__name__)
 
 MAXIMUM_DELAY = 7   #7 seconds
-SLEEP_TIME = 60    #600 seconds
+SLEEP_TIME = 600    #600 seconds
 
 
 class TimeSync(manager.LisBase):
@@ -152,6 +152,7 @@ class TimeSync(manager.LisBase):
         self.save_vm(self.server_id)
         time.sleep(SLEEP_TIME)
         self.unsave_vm(self.server_id)
+        time.sleep(120)
         vm_time = self.get_vm_time()
         t0 = time.time()
         host_time = self.get_host_time()
