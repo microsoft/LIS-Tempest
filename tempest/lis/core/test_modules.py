@@ -129,7 +129,7 @@ class LisModules(manager.LisBase):
                     self.linux_client.verify_file('reload_finished')
                     self.check_heartbeat_status(self.instance_name)
                     break
-                except exceptions.SSHTimeout as exc:
+                except lib.exceptions.SSHTimeout as exc:
                     self.check_heartbeat_status(self.instance_name)
                     max_attempts -= 1
                     continue
