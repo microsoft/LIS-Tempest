@@ -70,15 +70,20 @@ if [ $? -eq 0 ]; then
 fi
 pass=0
 START=$(date +%s)
-while [ $pass -lt 500 ]
+while [ $pass -lt 100 ]
 do
-    sudo modprobe -r hv_netvsc
-    sudo modprobe hv_netvsc
-    sudo modprobe -r hv_utils
-    sudo modprobe hv_utils
+    modprobe -r hv_netvsc
     sleep 1
-    sudo modprobe -r hid_hyperv
-    sudo modprobe hid_hyperv
+    modprobe hv_netvsc
+    sleep 1
+    modprobe -r hv_utils
+    sleep 1
+    modprobe hv_utils
+    sleep 1
+    modprobe -r hid_hyperv
+    sleep 1
+    modprobe hid_hyperv
+    sleep 1
     pass=$((pass+1))
 done
 echo "Finished testing, bringing up eth0"
@@ -87,9 +92,6 @@ sudo ifdown eth0
 sleep 1
 sudo ifup eth0
 sleep 1
-sudo ifdown eth0
-sleep 1
-sudo ifup eth0
 VerifyModules
 
 exit 0
