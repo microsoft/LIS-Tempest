@@ -15,6 +15,7 @@
 import os
 from tempest import config
 from tempest import exceptions
+from tempest.lib import exceptions as lib_exc
 from tempest import test
 from tempest.lis import manager
 from oslo_log import log as logging
@@ -99,7 +100,7 @@ class LisModules(manager.LisBase):
             self.linux_client.execute_script(
                 script_name, cmd_params, full_script_path, destination)
 
-        except exceptions.SSHExecCommandFailed as exc:
+        except lib_exc.SSHExecCommandFailed as exc:
 
             LOG.exception(exc)
             self._log_console_output()
@@ -129,7 +130,7 @@ class LisModules(manager.LisBase):
                     self.linux_client.verify_file('reload_finished')
                     self.check_heartbeat_status(self.instance_name)
                     break
-                except lib.exceptions.SSHTimeout as exc:
+                except lib_exc.SSHTimeout as exc:
                     self.check_heartbeat_status(self.instance_name)
                     max_attempts -= 1
                     continue

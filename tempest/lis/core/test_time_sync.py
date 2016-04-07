@@ -18,6 +18,7 @@ import os
 
 from tempest import config
 from tempest import exceptions
+from tempest.lib import exceptions as lib_exc
 from tempest import test
 #from tempest.common import debug
 from tempest.common.utils.windows.remote_client import WinRemoteClient
@@ -107,7 +108,7 @@ class TimeSync(manager.LisBase):
             self.linux_client.execute_script(
                 script_name, cmd_params, full_script_path, destination)
 
-        except exceptions.SSHExecCommandFailed as exc:
+        except lib_exc.SSHExecCommandFailed as exc:
 
             LOG.exception(exc)
             self._log_console_output()

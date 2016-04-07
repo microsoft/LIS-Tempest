@@ -14,7 +14,7 @@
 
 import functools
 import re
-from tempest import exceptions
+from tempest.lib import exceptions as lib_exc
 from tempest.common.utils import classloader
 from tempest.common.utils.linux import remote_client
 from oslo_log import log
@@ -50,7 +50,7 @@ def get_os_utils(**kvargs):
     linux_client = remote_client.RemoteClientBase(**kvargs)
     try:
         linux_client.validate_authentication()
-    except lib.exceptions.SSHTimeout:
+    except lib_exc.SSHTimeout:
         LOG.exception('ssh connection failed')
         raise
     distro = linux_client.get_os_type()
