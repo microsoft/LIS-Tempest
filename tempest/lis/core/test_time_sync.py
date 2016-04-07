@@ -31,7 +31,7 @@ CONF = config.CONF
 LOG = logging.getLogger(__name__)
 
 MAXIMUM_DELAY = 7   #7 seconds
-SLEEP_TIME = 600    #600 seconds
+SLEEP_TIME = 60    #600 seconds
 
 
 class TimeSync(manager.LisBase):
