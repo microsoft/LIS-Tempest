@@ -12,6 +12,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from tempest.common import waiters
 from tempest import config
 from tempest import exceptions
 from tempest import test
