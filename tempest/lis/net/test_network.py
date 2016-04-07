@@ -191,11 +191,11 @@ class Bridge(Network):
         # Create server with image and flavor from input scenario
         security_groups = [self.security_group]
         for _ in range(count):
-        self.instance = self.create_server(flavor=self.flavor_ref,
-                                           image_id=self.image_ref,
-                                           key_name=self.keypair['name'],
-                                           security_groups=security_groups,
-                                           wait_until='ACTIVE')
+            self.instance = self.create_server(flavor=self.flavor_ref,
+                                               image_id=self.image_ref,
+                                               key_name=self.keypair['name'],
+                                               security_groups=security_groups,
+                                               wait_until='ACTIVE')
             instance['instance_name'] = instance[
                 "OS-EXT-SRV-ATTR:instance_name"]
             floating_ip = self.nova_floating_ip_create()
