@@ -1779,7 +1779,7 @@ class LisBase(ScenarioTest):
             self.linux_client.get_disks_count(30)
             return self.linux_client.get_disks_count(60)
 
-        except exceptions.SSHExecCommandFailed as exc:
+        except lib_exc.SSHExecCommandFailed as exc:
             LOG.exception(exc)
             raise exc
 
