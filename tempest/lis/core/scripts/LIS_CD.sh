@@ -19,7 +19,7 @@ echoerr() { echo "$@" 1>&2; }
 cd ~
 
 # check if CDROM  module is loaded or no
-CD=$(sudo lsmod | grep ata_piix)
+CD=$(sudo lsmod |grep 'ata_piix\|isofs')
 if [[ $CD != "" ]] ; then
 	echo "ata_piix module is present"
 else
@@ -38,7 +38,7 @@ fi
 
 
 echo "##### Mount the CDROM #####"
-sudo mount /dev/dvd /mnt/
+sudo mount /dev/cdrom /mnt/
 sts=$?
     if [ 0 -ne ${sts} ]; then
         echoerr "Unable to mount the CDROM"
