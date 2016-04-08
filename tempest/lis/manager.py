@@ -1731,11 +1731,10 @@ class LisBase(ScenarioTest):
         """ Revert specified VM to specified snapshot. """
 
         self.host_client.run_powershell_cmd(
-            'Restore-VMSnapshot',
+            'Restore-VMSnapshot -Confirm:$false',
             ComputerName=self.host_name,
             VMName=instance_name,
-            Name=snapshot_name,
-            Confirm='$false')
+            Name=snapshot_name)
 
     def verify_heartbeat(self, instance_name):
         s_out = self.host_client.get_powershell_cmd_attribute(
