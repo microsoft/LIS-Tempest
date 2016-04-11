@@ -1690,6 +1690,17 @@ class LisBase(ScenarioTest):
         floppy_name = instance_name + '.vfd'
         self.addCleanup(self.remove_disk, instance_name, floppy_name)
 
+    def add_iso(self, instance_name):
+
+        script_location = "%s%s" % (self.script_folder,
+                                    'setupscripts\\add_iso.ps1')
+        self.host_client.run_powershell_cmd(
+            script_location,
+            hvServer=self.host_name,
+            vmName=instance_name)
+
+        iso_name = instance_name + '.iso'
+
     def get_parent_disk_size(self, disk_name):
 
         script_location = "%s%s" % (self.script_folder,

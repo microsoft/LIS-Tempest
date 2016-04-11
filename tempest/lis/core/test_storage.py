@@ -486,9 +486,13 @@ class Storage(StorageBase):
     @test.services('compute', 'network')
     def test_iso(self):
         self.spawn_vm()
+        self.stop_vm(self.server_id)
+        self.add_iso(self.instance_name)
+        self.start_vm(self.server_id)
         waiters.wait_for_server_status(self.servers_client, self.server_id, 'ACTIVE')
         self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
                                     self.ssh_user, self.keypair['private_key'])
+        
         self.check_iso()
         self.servers_client.delete_server(self.instance['id'])
 
