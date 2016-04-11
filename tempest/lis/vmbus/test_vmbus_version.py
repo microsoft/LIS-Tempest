@@ -57,7 +57,7 @@ class Vmbus(manager.LisBase):
     def add_keypair(self):
         self.keypair = self.create_keypair()
 
-	def boot_instance(self):
+    def boot_instance(self):
         # Create server with image and flavor from input scenario
         security_groups = [self.security_group]
         self.instance = self.create_server(flavor=self.flavor_ref,
@@ -111,7 +111,7 @@ class Vmbus(manager.LisBase):
             self._log_console_output()
             raise exc
 
-	@test.attr(type=['smoke', 'core', 'lis_vmbus'])
+    @test.attr(type=['smoke', 'core', 'lis_vmbus'])
     @test.services('compute')
     def test_lis_vmbus_version(self):
         self.spawn_vm()
