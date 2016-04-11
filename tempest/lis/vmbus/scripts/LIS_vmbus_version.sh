@@ -34,4 +34,4 @@ if [ "$vmbus_string" = "" ]; then
                 echo "Test passed! Found a matching VMBus string:\n ${vmbus_string}"
 fi
 
-exit 1
+exit 0
