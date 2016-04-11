@@ -31,3 +31,4 @@ etc/tempest.conf
 logs_tests/
 test_lists/
 results.html
+tempest/lis/vmbus/__init__.py
