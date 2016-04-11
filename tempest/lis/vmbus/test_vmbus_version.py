@@ -111,11 +111,11 @@ class Vmbus(manager.LisBase):
             self._log_console_output()
             raise exc
 
-    @test.attr(type=['smoke', 'core', 'lis_vmbus'])
+    @test.attr(type=['smoke', 'core', 'vmbus'])
     @test.services('compute')
     def test_lis_vmbus_version(self):
         self.spawn_vm()
         self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
                                     self.ssh_user, self.keypair['private_key'])
-        self.check_lis_vmbus_version()
+        self.check_vmbus_version()
         self.servers_client.delete_server(self.instance['id'])
