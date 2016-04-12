@@ -32,12 +32,12 @@ fi
 firstDrive=1
 for drive in /dev/sd*[^0-9];
 do
-    if [ ${drive} = "sda" ];
+    if [ ${drive} = "/dev/sda" ];
     then
         continue
     fi
-    (echo d;echo;echo w) | sudo fdisk  $drive
-    (echo n;echo p;echo 1;echo;echo;echo w) | sudo fdisk  $drive
+    (echo d;echo;echo w) | sudo fdisk $drive
+    (echo n;echo p;echo 1;echo;echo;echo w) | sudo fdisk $drive
     if [ "$?" = "0" ]; then
         sleep 5
         sudo mkfs.$fileSystem  ${drive}1

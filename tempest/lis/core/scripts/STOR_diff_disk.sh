@@ -58,7 +58,7 @@ do
    sleep 1
 
 # Create file sytem on it .
-   echo "y" | sudo mkfs.$FILESYS ${driveName}1  ; echo "y" | sudo mkfs.$FILESYS ${driveName}2
+   echo "y" | sudo mkfs.ext3 ${driveName}1  ; echo "y" | sudo mkfs.ext3 ${driveName}2
    sts=$?
         if [ 0 -ne ${sts} ]; then
             echoerr "Error:  creating filesystem  Failed ${sts}"
