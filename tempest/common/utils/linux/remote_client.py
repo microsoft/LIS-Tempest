@@ -271,7 +271,7 @@ class RemoteClient(RemoteClientBase):
 
     def get_disks_count(self, sleep_count=1):
         command = 'sleep ' + \
-            str(sleep_count) + '; fdisk -l | grep "Disk /dev/sd*" | wc -l'
+            str(sleep_count) + '; sudo fdisk -l | grep "Disk /dev/sd*" | wc -l'
         output = self.exec_command(command)
         return int(output)
 
