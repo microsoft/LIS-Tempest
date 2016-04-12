@@ -36,14 +36,13 @@ do
     then
         continue
     fi
-    driveName="/dev/${drive}"
-    (echo d;echo;echo w) | sudo fdisk  $driveName
-    (echo n;echo p;echo 1;echo;echo;echo w) | sudo fdisk  $driveName
+    (echo d;echo;echo w) | sudo fdisk  $drive
+    (echo n;echo p;echo 1;echo;echo;echo w) | sudo fdisk  $drive
     if [ "$?" = "0" ]; then
         sleep 5
-        sudo mkfs.$fileSystem  ${driveName}1
+        sudo mkfs.$fileSystem  ${drive}1
         if [ "$?" = "0" ]; then
-            sudo mount ${driveName}1 /mnt
+            sudo mount ${drive}1 /mnt
                     if [ "$?" = "0" ]; then
                         sudo mkdir /mnt/Example
                         sudo dd if=/dev/zero of=/mnt/Example/data bs=10M count=50
