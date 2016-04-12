@@ -1619,7 +1619,7 @@ class LisBase(ScenarioTest):
             controllerType=ctrl_type,
             controllerId=ctrl_id,
             Lun=ctrl_loc,
-            parentType=vhd_type)
+            vhdFormat=vhd_type)
 
         disk_name = '-'.join([instance_name, ctrl_type,
                               str(ctrl_id), str(ctrl_loc), 'Diff.']) + vhd_type
