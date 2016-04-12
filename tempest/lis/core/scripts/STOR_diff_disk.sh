@@ -16,20 +16,71 @@
 
 echoerr() { echo "$@" 1>&2; }
 
-sudo mount /dev/sdb1 /mnt
-if [ "$?" = "0" ]; then
-        sudo mkdir -p /mnt/ica
-        sudo dd if=/dev/sda1 of=/mnt/ica/test.dat count=2048 > /dev/null 2>&1
-        if [ "$?" = "0" ]; then
-            sudo umount /mnt
-            if [ "$?" != "0" ]; then
-                exit 55
-            fi
-        else
-            exit 60
+# Count the Number of partition present in added new Disk .
+count=0
+for disk in $(sudo cat /proc/partitions | grep sd | awk '{print $4}')
+do
+        if [[ "$disk" != "sda"* ]];
+        then
+                ((count++))
         fi
-else
-    exit 80
-fi
+done
 
-exit 0
+((count--))
+
+# Format, Partition and mount all the new disk on this system.
+for driveName in /dev/sd*[^0-9];
+do
+    #
+    # Skip /dev/sda
+    #
+    if [ $driveName != "/dev/sda"  ] ; then
+
+    # Delete the exisiting partition
+
+    for (( c=1 ; c<=count; count--))
+        do
+            (echo d; echo $c ; echo ; echo w) | sudo fdisk $driveName
+            sleep 5
+        done
+
+# Partition Drive
+    (echo n; echo p; echo 1; echo ; echo +500M; echo ; echo w) | sudo fdisk $driveName
+    sleep 5
+    (echo n; echo p; echo 2; echo ; echo; echo ; echo w) | sudo fdisk $driveName
+    sleep 5
+    sts=$?
+  if [ 0 -ne ${sts} ]; then
+      echo "Error:  Partitioning disk Failed ${sts}"
+      exit 1
+  fi
+
+   sleep 1
+
+# Create file sytem on it .
+   echo "y" | sudo mkfs.$FILESYS ${driveName}1  ; echo "y" | sudo mkfs.$FILESYS ${driveName}2
+   sts=$?
+        if [ 0 -ne ${sts} ]; then
+            echoerr "Error:  creating filesystem  Failed ${sts}"
+            exit 1
+        fi
+
+   sleep 1
+
+# mount the disk
+   MountName="/mnt/1"
+   if [ ! -e ${MountName} ]; then
+     sudo mkdir $MountName
+   fi
+   MountName1="/mnt/2"
+   if [ ! -e ${MountName1} ]; then
+     sudo mkdir $MountName1
+   fi
+   sudo mount ${driveName}1 $MountName ; sudo mount ${driveName}2 $MountName1
+   sts=$?
+       if [ 0 -ne ${sts} ]; then
+           echoerr "Error:  mounting disk Failed ${sts}"
+           exit 1
+       fi
+    fi
+done

@@ -18,7 +18,7 @@ expectedDiskCount=$1
 fileSystem=$2
 echoerr() { echo "$@" 1>&2; }
 sdCount=0
-for drive in $(sudo find /sys/devices/ -name sd* | grep 'sd.$' | sed 's/.*\(...\)$/\1/')
+for driveCount in /dev/sd*[^0-9];
 do
     sdCount=$((sdCount+1))
 done
@@ -30,7 +30,7 @@ then
 fi
 
 firstDrive=1
-for drive in $(sudo find /sys/devices/ -name sd* | grep 'sd.$' | sed 's/.*\(...\)$/\1/')
+for drive in /dev/sd*[^0-9];
 do
     if [ ${drive} = "sda" ];
     then
