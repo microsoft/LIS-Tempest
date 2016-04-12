@@ -20,7 +20,9 @@
 #
 ########################################################################
 
-echoerr() { echo "$@" 1>&2; }
+echoerr() {
+        echo "$@" 1>&2;
+}
 
 #
 # Checking for the VMBus protocol string in dmesg
