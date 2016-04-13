@@ -197,7 +197,7 @@ class StorageBase(manager.LisBase):
         self.format_disk(exc_dsk_cnt, filesystem)
         self.servers_client.delete_server(self.instance['id'])
 
-    def _test_hot_remove_passthrough(self, count, exc_dsk_cnt):
+    def _test_hot_remove_passthrough_backup(self, count, exc_dsk_cnt):
         self.spawn_vm()
         self.stop_vm(self.server_id)
         self.disks = []
@@ -217,6 +217,24 @@ class StorageBase(manager.LisBase):
             for disk in self.disks:
                 self.detach_passthrough(disk)
             raise exc
+        self.servers_client.delete_server(self.instance['id'])
+
+    def _test_hot_remove_passthrough(self, pos, vhd_type, exc_dsk_cnt):
+        self.spawn_vm()
+        self.stop_vm(self.server_id)
+        if isinstance(pos, list):
+            for position in pos:
+                self.add_pass_disk(self.instance_name, position)
+        else:
+            self.add_pass_disk(self.instance_name, pos)
+        self.start_vm(self.server_id)
+
+        self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
+                                    self.ssh_user, self.keypair['private_key'])
+        for disk in self.disks:
+            self.detach_disk(self.instance_name, disk)
+        disk_count = self.count_disks()
+        self.assertEqual(disk_count, 1)
         self.servers_client.delete_server(self.instance['id'])
 
     def _test_hot_add_storage(self, pos, vhd_type, exc_dsk_cnt, filesystem):
@@ -420,8 +438,8 @@ class StorageBase(manager.LisBase):
         self._test_hot_add_passthrough(positions, 2, self.file_system)
 
     def _test_pass_hot_remove_multi_scsi(self):
-        count = ['b', 'c']
-        self._test_hot_remove_passthrough(count, 1)
+        positions = [('SCSI', 0, 1), ('SCSI', 0, 2)]
+        self._test_hot_add_passthrough(positions, 2, self.file_system)
 
     def _test_fixed_scsi(self):
         position = ('SCSI', 1, 1)
