@@ -161,29 +161,6 @@ class StorageBase(manager.LisBase):
                 self.detach_passthrough(disk)
         self.servers_client.delete_server(self.instance['id'])
 
-    def _test_hot_add_passthrough_backup(self, count, exc_dsk_cnt, filesystem):
-        self.spawn_vm()
-        waiters.wait_for_server_status(self.servers_client, self.server_id, 'ACTIVE')
-        self.disks = []
-
-        for dev in count:
-            disk = self.add_passthrough_disk(dev)
-            self.disks.append(disk)
-
-        self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
-                                    self.ssh_user, self.keypair['private_key'])
-        try:
-            self.format_disk(exc_dsk_cnt, filesystem)
-
-        except Exception as exc:
-            LOG.exception(exc)
-            self._log_console_output()
-            raise exc
-        finally:
-            for disk in self.disks:
-                self.detach_passthrough(disk)
-        self.servers_client.delete_server(self.instance['id'])
-
     def _test_hot_add_passthrough(self, pos, exc_dsk_cnt, filesystem):
         self.spawn_vm()
         waiters.wait_for_server_status(self.servers_client, self.server_id, 'ACTIVE')
@@ -195,28 +172,6 @@ class StorageBase(manager.LisBase):
         self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
                                     self.ssh_user, self.keypair['private_key'])
         self.format_disk(exc_dsk_cnt, filesystem)
-        self.servers_client.delete_server(self.instance['id'])
-
-    def _test_hot_remove_passthrough_backup(self, count, exc_dsk_cnt):
-        self.spawn_vm()
-        self.stop_vm(self.server_id)
-        self.disks = []
-        for dev in count:
-            disk = self.add_passthrough_disk(dev)
-            self.disks.append(disk)
-        self.start_vm(self.server_id)
-        self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
-                                    self.ssh_user, self.keypair['private_key'])
-        try:
-            for disk in self.disks:
-                self.detach_passthrough(disk)
-            disk_count = self.count_disks()
-            self.assertEqual(disk_count, exc_dsk_cnt)
-        except Exception as exc:
-            LOG.exception(exc)
-            for disk in self.disks:
-                self.detach_passthrough(disk)
-            raise exc
         self.servers_client.delete_server(self.instance['id'])
 
     def _test_hot_remove_passthrough(self, pos, vhd_type, exc_dsk_cnt):
