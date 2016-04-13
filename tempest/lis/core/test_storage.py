@@ -259,8 +259,6 @@ class StorageBase(manager.LisBase):
     def _test_hot_swap_smp(self, pos, vhd_type, exc_dsk_cnt, filesystem):
         self.spawn_vm()
         waiters.wait_for_server_status(self.servers_client, self.server_id, 'ACTIVE')
-        self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
-                                    self.ssh_user, self.keypair['private_key'])
         vcpu_count = self.linux_client.get_number_of_vcpus()
         if vcpu_count < 2:
             self.servers_client.stop_server(self.server_id)
@@ -279,6 +277,8 @@ class StorageBase(manager.LisBase):
             self.add_disk(self.instance_name, self.disk_type,
                           pos, vhd_type, self.sector_size)
 
+        self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
+                                    self.ssh_user, self.keypair['private_key'])
         self.format_disk(exc_dsk_cnt, filesystem)
 
         for disk in self.disks:
