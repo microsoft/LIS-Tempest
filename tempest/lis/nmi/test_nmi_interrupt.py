@@ -126,6 +126,6 @@ class nmi(manager.LisBase):
         self.spawn_vm()
         self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
                                     self.ssh_user, self.keypair['private_key'])
-		self.send_nmi_interrupt(self.instance_name)
-		self.check_nmi_interrupt()
+	self.send_nmi_interrupt(self.instance_name)
+	self.check_nmi_interrupt()
         self.servers_client.delete_server(self.instance['id'])
