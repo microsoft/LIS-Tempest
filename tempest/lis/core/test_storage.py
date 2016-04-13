@@ -439,7 +439,7 @@ class StorageBase(manager.LisBase):
 
     def _test_pass_hot_remove_multi_scsi(self):
         positions = [('SCSI', 0, 1), ('SCSI', 0, 2)]
-        self._test_hot_add_passthrough(positions, 2, self.file_system)
+        self._test_hot_remove_passthrough(positions, 2, self.file_system)
 
     def _test_fixed_scsi(self):
         position = ('SCSI', 1, 1)
