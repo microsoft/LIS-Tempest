@@ -1728,6 +1728,14 @@ class LisBase(ScenarioTest):
             hvServer=self.host_name,
             vmName=instance_name)
 
+    def check_kvp_basic(self, instance_name):
+        script_location = "%s%s" % (self.script_folder,
+                                    'setupscripts\\kvp_basic.ps1')
+        self.host_client.run_powershell_cmd(
+            script_location,
+            hvServer=self.host_name,
+            vmName=instance_name)
+
     def change_cpu(self, instance_name, new_cpu_count):
         """Change the vcpu of a vm"""
 
@@ -1763,6 +1771,16 @@ class LisBase(ScenarioTest):
             Name='Heartbeat')
 
         assert_msg = 'Heartbeat disabled for VM %s' % instance_name
+        self.assertTrue(s_out.lower() != 'True', assert_msg)
+
+    def verify_kvp(self, instance_name):
+        s_out = self.host_client.get_powershell_cmd_attribute(
+            'Get-VMIntegrationService', 'Enabled',
+            ComputerName=self.host_name,
+            VMName=instance_name,
+            Name="'Key-Value Pair Exchange'")
+
+        assert_msg = 'KVP disabled for VM %s' % instance_name
         self.assertTrue(s_out.lower() != 'True', assert_msg)
 
     def set_ram_settings(self, instance_name, new_memory):
@@ -1849,7 +1867,7 @@ class LisBase(ScenarioTest):
         cmd_params = []
         self.linux_client.execute_script(
             script_name, cmd_params, full_script_path, destination)
-			
+
     def get_vm_time(self):
         unix_time = self.linux_client.get_unix_time()
         LOG.debug('VM unix time %s ', unix_time)
