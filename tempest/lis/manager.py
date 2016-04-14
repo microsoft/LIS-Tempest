@@ -1831,6 +1831,17 @@ class LisBase(ScenarioTest):
         self.linux_client.execute_script(
             script_name, cmd_params, full_script_path, destination)
 
+    def check_vcpu_offline(self):
+        script_name = 'vcpu_verify_online.sh'
+        script_path = '/core/scripts/' + script_name
+        destination = '/tmp/'
+        my_path = os.path.abspath(
+            os.path.normpath(os.path.dirname(__file__)))
+        full_script_path = my_path + script_path
+        cmd_params = []
+        self.linux_client.execute_script(
+            script_name, cmd_params, full_script_path, destination)
+			
     def get_vm_time(self):
         unix_time = self.linux_client.get_unix_time()
         LOG.debug('VM unix time %s ', unix_time)
