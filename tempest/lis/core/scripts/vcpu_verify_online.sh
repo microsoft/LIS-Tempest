@@ -22,12 +22,11 @@
 
 ########################################################################
 #
-# VCPU_verify_online.sh
+# vcpu_verify_online.sh
 #
 # Description:
 #	This script was created to automate the testing of VCPU online or offline.
-#   This script will verify if all the CPUs can be offline by checking
-#	the /proc/cpuinfo file.
+#	It will verify if all the CPUs can be offline by checking the /proc/cpuinfo file.
 #	The VM is configured with a number of CPU cores.
 #	Each core can't be offline except vcpu0 for a successful test pass.
 #
