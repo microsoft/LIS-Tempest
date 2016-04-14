@@ -94,6 +94,11 @@ class ISS(manager.LisBase):
             self.assertTrue(
                 vcpu_count == _, "Expected %s , actual %s" % (_, vcpu_count))
 
+    def _test_vcpu_offline_set(self, _):
+        self.stop_vm(self.server_id)
+        self.change_cpu(self.instance_name, _)
+        self.start_vm(self.server_id)
+				
     @test.attr(type=['smoke', 'core', 'smp'])
     @test.services('compute', 'network')
     def test_shutdown_smp(self):
@@ -109,3 +114,14 @@ class ISS(manager.LisBase):
         self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
                                     self.ssh_user, self.keypair['private_key'])
         self._test_shutdown_multi_cpu(5)
+		
+    @test.attr(type=['core', 'smp'])
+    @test.services('compute')
+    def test_vcpu_offline(self):
+        self.spawn_vm()
+		# Define the number of CPU cores to be set on the instance
+        self._test_vcpu_offline_set(5)
+        self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
+                                    self.ssh_user, self.keypair['private_key'])
+        self.check_vcpu_offline()
+        self.servers_client.delete_server(self.instance['id'])
