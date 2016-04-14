@@ -28,6 +28,8 @@
 #	This script was created to automate the testing of VCPU online or offline.
 #   This script will verify if all the CPUs can be offline by checking
 #	the /proc/cpuinfo file.
+#	The VM is configured with a number of CPU cores.
+#	Each core can't be offline except vcpu0 for a successful test pass.
 #
 #	The test performs the following steps:
 #		1. Looks for the Hyper-v timer property of each CPU under /proc/cpuinfo
@@ -36,6 +38,7 @@
 # Note: The Host of Hyper-V 2012 R2 don't support the CPU online or offline, so
 # To make sure the CPU on guest can't be offline.
 #
+#########################################################################
 
 nonCPU0inter=0
 
