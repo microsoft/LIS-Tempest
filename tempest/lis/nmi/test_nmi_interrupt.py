@@ -95,3 +95,18 @@ class nmi(manager.LisBase):
         self.send_nmi_interrupt(self.instance_name)
         self.check_nmi_interrupt()
         self.servers_client.delete_server(self.instance['id'])
+
+    @test.attr(type=['smoke', 'nmi'])
+    @test.services('compute')
+    def test_lis_nmi_interrupt_change_status(self):
+        self.spawn_vm()
+        self.stop_vm(self.server_id)
+        self.send_nmi_interrupt_change_status(self.instance_name)
+        self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
+                                    self.ssh_user, self.keypair['private_key'])
+        self.save_vm(self.server_id)
+	self.send_nmi_interrupt_change_status(self.instance_name)
+	self.unsave_vm(self.server_id)
+        self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
+                                    self.ssh_user, self.keypair['private_key'])
+        self.servers_client.delete_server(self.instance['id'])
