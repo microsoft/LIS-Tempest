@@ -280,6 +280,10 @@ class RemoteClient(RemoteClientBase):
             dev=dev, destination_ip=destination_ip)
         return self.exec_command(cmd)
 
+    def kvp_verify_value(self):
+        cmd = "chmod 755 /tmp/kvp_client; /tmp/kvp_client 0 | grep \"EEE; Value: 555\""
+        return self.exec_command(cmd)
+
 
 class FedoraUtils(RemoteClient):
 

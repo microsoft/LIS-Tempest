@@ -1736,6 +1736,17 @@ class LisBase(ScenarioTest):
             hvServer=self.host_name,
             vmName=instance_name)
 
+    def kvp_add_value(self, instance_name):
+        script_location = "%s%s" % (self.script_folder,
+                                    'setupscripts\\kvp_add_value.ps1')
+        self.host_client.run_powershell_cmd(
+            script_location,
+            hvServer=self.host_name,
+            vmName=instance_name,
+            key='EEE',
+            Value='555',
+            Pool='0')
+
     def change_cpu(self, instance_name, new_cpu_count):
         """Change the vcpu of a vm"""
 
@@ -1867,6 +1878,16 @@ class LisBase(ScenarioTest):
         cmd_params = []
         self.linux_client.execute_script(
             script_name, cmd_params, full_script_path, destination)
+
+    def send_kvp_client(self):
+        script_name = 'kvp_client'
+        script_path = '/../../tools/KVP/' + script_name
+        destination = '/tmp/'
+        my_path = os.path.abspath(
+            os.path.normpath(os.path.dirname(__file__)))
+        full_script_path = my_path + script_path
+        cmd_params = []
+        self.linux_client.copy_over(full_script_path, destination)
 
     def get_vm_time(self):
         unix_time = self.linux_client.get_unix_time()
