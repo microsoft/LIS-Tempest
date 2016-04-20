@@ -90,4 +90,4 @@ class HeartBeat(manager.LisBase):
     @test.services('compute', 'network')
     def test_heartbeat(self):
         self.spawn_vm()
-        self.verify_heartbeat(self.instance_name)
+        self.verify_lis(self.instance_name, 'Heartbeat')

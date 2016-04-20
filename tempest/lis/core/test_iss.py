@@ -86,43 +86,15 @@ class ISS(manager.LisBase):
         self.nova_floating_ip_add()
         self.server_id = self.instance['id']
 
-    def _get_iss_status(self):
-        """ Get the status of integrated shutdown services """
-
-        s_out = self.host_client.get_powershell_cmd_attribute(
-            'Get-VMIntegrationService', 'Enabled',
-            ComputerName=self.host_name,
-            VMName=self.instance_name,
-            Name='Shutdown')
-        return s_out.lower().strip()
-
-    def _disable_iss(self):
-        """ Disable the integrated shutdown services """
-
-        self.host_client.run_powershell_cmd(
-            'Disable-VMIntegrationService',
-            ComputerName=self.host_name,
-            VMName=self.instance_name,
-            Name='Shutdown')
-
-    def _enable_iss(self):
-        """ Enable the integrated shutdown services """
-
-        self.host_client.run_powershell_cmd(
-            'Enable-VMIntegrationService',
-            ComputerName=self.host_name,
-            VMName=self.instance_name,
-            Name='Shutdown')
-
     def _verify_integrated_shutdown_services(self):
-        status = self._get_iss_status()
+        status = self.verify_lis(self.instance_name, 'Shutdown')
         self.assertTrue('true' == status,
                         "Integrated shutdown services disabled.")
-        self._disable_iss()
-        status = self._get_iss_status()
+        self.disable_lis('Shutdown')
+        status = self.verify_lis(self.instance_name, 'Shutdown')
         self.assertTrue('false' == status, 'Failed to disable iss.')
-        self._enable_iss()
-        status = self._get_iss_status()
+        self.enable_lis('Shutdown')
+        status = self.verify_lis(self.instance_name, 'Shutdown')
         self.assertTrue('true' == status, 'Failed to enable iss.')
 
     @test.attr(type=['smoke', 'core', 'iss'])

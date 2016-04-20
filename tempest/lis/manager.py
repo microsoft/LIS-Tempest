@@ -1774,25 +1774,34 @@ class LisBase(ScenarioTest):
             VMName=instance_name,
             Name=snapshot_name)
 
-    def verify_heartbeat(self, instance_name):
+    def verify_lis(self, instance_name, service):
         s_out = self.host_client.get_powershell_cmd_attribute(
             'Get-VMIntegrationService', 'Enabled',
             ComputerName=self.host_name,
             VMName=instance_name,
-            Name='Heartbeat')
+            Name=service)
 
-        assert_msg = 'Heartbeat disabled for VM %s' % instance_name
+        assert_msg = '${0} disabled for VM ${1}'.format(service, instance_name)
         self.assertTrue(s_out.lower() != 'True', assert_msg)
+        return s_out.lower().strip()
 
-    def verify_kvp(self, instance_name):
-        s_out = self.host_client.get_powershell_cmd_attribute(
-            'Get-VMIntegrationService', 'Enabled',
+    def enable_lis(self, service):
+        """ Enable selected integration services """
+
+        self.host_client.run_powershell_cmd(
+            'Enable-VMIntegrationService',
             ComputerName=self.host_name,
-            VMName=instance_name,
-            Name="'Key-Value Pair Exchange'")
+            VMName=self.instance_name,
+            Name=service)
 
-        assert_msg = 'KVP disabled for VM %s' % instance_name
-        self.assertTrue(s_out.lower() != 'True', assert_msg)
+    def disable_lis(self, service):
+        """ Disable selected integration services """
+
+        self.host_client.run_powershell_cmd(
+            'Disable-VMIntegrationService',
+            ComputerName=self.host_name,
+            VMName=self.instance_name,
+            Name=service)
 
     def set_ram_settings(self, instance_name, new_memory):
         self.host_client.run_powershell_cmd(
