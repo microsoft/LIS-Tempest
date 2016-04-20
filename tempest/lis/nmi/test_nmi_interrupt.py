@@ -111,3 +111,12 @@ class nmi(manager.LisBase):
         self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
                                     self.ssh_user, self.keypair['private_key'])
         self.servers_client.delete_server(self.instance['id'])
+
+    @test.attr(type=['smoke', 'nmi'])
+    @test.services('compute')
+    def test_lis_nmi_unprivileged(self):
+        self.spawn_vm()
+        self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
+                                    self.ssh_user, self.keypair['private_key'])
+        self.send_nmi_unprivileged(self.instance_name)
+        self.servers_client.delete_server(self.instance['id'])
