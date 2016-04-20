@@ -1785,7 +1785,7 @@ class LisBase(ScenarioTest):
         self.assertTrue(s_out.lower() != 'True', assert_msg)
         return s_out.lower().strip()
 
-    def enable_lis(self, service):
+    def enable_lis(self, instance_name, service):
         """ Enable selected integration services """
 
         self.host_client.run_powershell_cmd(
@@ -1794,7 +1794,7 @@ class LisBase(ScenarioTest):
             VMName=self.instance_name,
             Name=service)
 
-    def disable_lis(self, service):
+    def disable_lis(self, instance_name, service):
         """ Disable selected integration services """
 
         self.host_client.run_powershell_cmd(

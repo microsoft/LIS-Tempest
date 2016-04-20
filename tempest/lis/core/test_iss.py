@@ -90,10 +90,10 @@ class ISS(manager.LisBase):
         status = self.verify_lis(self.instance_name, 'Shutdown')
         self.assertTrue('true' == status,
                         "Integrated shutdown services disabled.")
-        self.disable_lis('Shutdown')
+        self.disable_lis(self.instance_name, 'Shutdown')
         status = self.verify_lis(self.instance_name, 'Shutdown')
         self.assertTrue('false' == status, 'Failed to disable iss.')
-        self.enable_lis('Shutdown')
+        self.enable_lis(self.instance_name, 'Shutdown')
         status = self.verify_lis(self.instance_name, 'Shutdown')
         self.assertTrue('true' == status, 'Failed to enable iss.')
 
