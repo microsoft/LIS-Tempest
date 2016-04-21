@@ -29,7 +29,7 @@ LOG = logging.getLogger(__name__)
 load_tests = test_utils.load_tests_input_scenario_utils
 
 
-class Network(manager.ScenarioTest):
+class Network(manager.LisBase):
 
     """
     This smoke test case follows this basic set of operations:
