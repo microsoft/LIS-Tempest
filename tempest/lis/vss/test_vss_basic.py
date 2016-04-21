@@ -72,31 +72,6 @@ class TestLis(manager.ScenarioTest):
                       image=self.image_ref, flavor=self.flavor_ref,
                       ssh=self.run_ssh, ssh_user=self.ssh_user))
 
-    def add_keypair(self):
-        self.keypair = self.create_keypair()
-
-    def boot_instance(self):
-        # Create server with image and flavor from input scenario
-        security_groups = [self.security_group]
-    	self.instance = self.create_server(flavor=self.flavor_ref,
-                    	                   image_id=self.image_ref,
-                            	           key_name=self.keypair['name'],
-                                    	   security_groups=security_groups,
-                                       	   wait_until='ACTIVE')
-        self.instance_name = self.instance["OS-EXT-SRV-ATTR:instance_name"]
-        self.host_name = self.instance["OS-EXT-SRV-ATTR:hypervisor_hostname"]
-
-    def nova_floating_ip_create(self):
-        floating_network_id = CONF.network.public_network_id
-        self.floating_ip = self.floating_ips_client.create_floatingip(floating_network_id=floating_network_id)
-        self.addCleanup(self.delete_wrapper,
-                self.floating_ips_client.delete_floatingip,
-                self.floating_ip['floatingip']['floating_ip_address'])
-
-    def nova_floating_ip_add(self):
-    	self.compute_floating_ips_client.associate_floating_ip_to_server(
-    	   self.floating_ip['floatingip']['floating_ip_address'], self.instance['id'])
-
     def check_vss_deamon(self):
         """ Check if hv_vss_deamon runs on the vm """
         try:
