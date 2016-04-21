@@ -1558,6 +1558,14 @@ class LisBase(ScenarioTest):
         self.servers_client.resume_server(vm_id)
         waiters.wait_for_server_status(self.servers_client, vm_id, 'ACTIVE')
 
+    def pause_vm(self, vm_id):
+        self.servers_client.pause_server(vm_id)
+        waiters.wait_for_server_status(self.servers_client, vm_id, 'PAUSED')
+
+    def unpause_vm(self, vm_id):
+        self.servers_client.unpause_server(vm_id)
+        waiters.wait_for_server_status(self.servers_client, vm_id, 'ACTIVE')
+
     def stop_vm(self, vm_id):
         self.servers_client.stop_server(vm_id)
         waiters.wait_for_server_status(self.servers_client, vm_id, 'SHUTOFF')
