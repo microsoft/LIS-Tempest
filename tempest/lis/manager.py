@@ -1969,7 +1969,7 @@ class LisBase(ScenarioTest):
         self.floating_ip = self.floating_ips_client.create_floatingip(floating_network_id=floating_network_id)
         self.addCleanup(self.delete_wrapper,
                         self.floating_ips_client.delete_floatingip,
-                        self.floating_ip['floatingip']['floating_ip_address'])
+                        self.floating_ip['floatingip']['id'])
 
     def nova_floating_ip_add(self):
         self.compute_floating_ips_client.associate_floating_ip_to_server(
