@@ -389,7 +389,7 @@ class StorageBase(manager.LisBase):
         self._test_storage(positions, 'Dynamic', 2, self.file_system)
 
     def _test_multiple_scsi(self):
-        positions = [('SCSI', 0, 0), ('SCSI', 0, 1)]
+        positions = [('SCSI', 0, 1), ('SCSI', 0, 2)]
         self._test_storage(positions, 'Dynamic', 2, self.file_system)
 
     def _test_dynamic_hot_add_scsi(self):
@@ -401,15 +401,15 @@ class StorageBase(manager.LisBase):
         self._test_hot_remove(position, 'Dynamic', 1)
 
     def _test_dynamic_hot_swap_scsi(self):
-        positions = [('SCSI', 0, 0), ('SCSI', 0, 1)]
+        positions = [('SCSI', 0, 1), ('SCSI', 0, 2)]
         self._test_hot_swap(positions, 'Dynamic', 2, self.file_system)
 
     def _test_dynamic_hot_swap_smp_scsi(self):
-        positions = [('SCSI', 0, 0), ('SCSI', 0, 1)]
+        positions = [('SCSI', 0, 1), ('SCSI', 0, 2)]
         self._test_hot_swap_smp(positions, 'Dynamic', 2, self.file_system)
 
     def _test_dynamic_hot_add_multi_scsi(self):
-        positions = [('SCSI', 0, 0), ('SCSI', 0, 1)]
+        positions = [('SCSI', 0, 1), ('SCSI', 0, 2)]
         self._test_hot_add_storage(positions, 'Dynamic', 2, self.file_system)
 
     def _test_diff_disk_ide(self):
