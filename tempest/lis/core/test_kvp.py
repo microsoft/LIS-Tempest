@@ -61,7 +61,7 @@ class KVP(manager.LisBase):
         self.verify_lis(self.instance_name, "'Key-Value Pair Exchange'")
         """ Check if KVP runs on the vm """
         try:
-            output = self.linux_client.verify_deamon(self.deamon)
+            output = self.linux_client.verify_daemon(self.deamon)
             LOG.info('KVP Deamon is running ${0}'.format(output))
             self.assertIsNotNone(output)
         except Exception:

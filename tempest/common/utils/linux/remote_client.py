@@ -251,7 +251,7 @@ class RemoteClient(RemoteClientBase):
         output = self.exec_command(cmd)
         return output
 
-    def verify_deamon(self, deamon):
+    def verify_daemon(self, deamon):
         cmd = 'ps cax | grep %s' % deamon
         output = self.exec_command(cmd)
         return output

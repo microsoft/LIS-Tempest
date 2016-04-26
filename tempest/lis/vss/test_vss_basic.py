@@ -81,7 +81,7 @@ class TestLis(manager.ScenarioTest):
                 username=self.image_utils.ssh_user(self.image_ref),
                 private_key=self.keypair['private_key'])
             linux_client.create_file(self.filename)
-            output = linux_client.verify_deamon(self.deamon)
+            output = linux_client.verify_daemon(self.deamon)
             LOG.info('VSS Deamon is running ${0}'.format(output))
             self.assertIsNotNone(output)
         except Exception:
