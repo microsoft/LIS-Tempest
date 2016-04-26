@@ -224,7 +224,7 @@ fi
 ntpdc -p
 sts=$?
     if [ 0 -ne ${sts} ]; then
-        LogMsg "Unable to query NTP deamon: ${sts}"
+        LogMsg "Unable to query NTP daemon: ${sts}"
 	    LogMsg "Aborting test."
         UpdateTestState "TestAborted"
 	    exit 1

@@ -62,7 +62,7 @@ class TestLis(manager.ScenarioTest):
             self.image_utils.is_sshable_image(self.image_ref)
         self.ssh_user = self.image_utils.ssh_user(self.image_ref)
         self.filename = '~/testfile.txt'
-        self.deamon = 'hv_vss_daemon'
+        self.daemon = 'hv_vss_daemon'
         self.username = CONF.host_credentials.host_user_name
         self.passwd = CONF.host_credentials.host_password
         self.scriptfolder = CONF.host_credentials.host_setupscripts_folder
@@ -72,8 +72,8 @@ class TestLis(manager.ScenarioTest):
                       image=self.image_ref, flavor=self.flavor_ref,
                       ssh=self.run_ssh, ssh_user=self.ssh_user))
 
-    def check_vss_deamon(self):
-        """ Check if hv_vss_deamon runs on the vm """
+    def check_vss_daemon(self):
+        """ Check if hv_vss_daemon runs on the vm """
         try:
             linux_client = self.get_remote_client(
                 ip_address=self.floating_ip[
@@ -81,11 +81,11 @@ class TestLis(manager.ScenarioTest):
                 username=self.image_utils.ssh_user(self.image_ref),
                 private_key=self.keypair['private_key'])
             linux_client.create_file(self.filename)
-            output = linux_client.verify_daemon(self.deamon)
-            LOG.info('VSS Deamon is running ${0}'.format(output))
+            output = linux_client.verify_daemon(self.daemon)
+            LOG.info('VSS daemon is running ${0}'.format(output))
             self.assertIsNotNone(output)
         except Exception:
-            LOG.exception('VSS Deamon ' + self.deamon + ' is not running!')
+            LOG.exception('VSS daemon ' + self.daemon + ' is not running!')
             self._log_console_output()
             raise
 
@@ -189,7 +189,7 @@ class TestLis(manager.ScenarioTest):
         self.boot_instance()
         self.nova_floating_ip_create()
         self.nova_floating_ip_add()
-        self.check_vss_deamon()
+        self.check_vss_daemon()
         self.create_file()
         self.backup_vm()
         self.delete_file()

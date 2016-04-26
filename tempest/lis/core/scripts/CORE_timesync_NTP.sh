@@ -151,7 +151,7 @@ echo "#### NTP time syncronization test ####"
 # fi
 
 # Check on what distro we are running
-# rhel, centos, etc.. 
+# rhel, centos, etc..
 if is_fedora ; then
     # Check if ntpd is running. On Fedora based distros we have ntpstat.
     sudo ntpstat 1> /dev/null 2> /dev/null
@@ -186,7 +186,7 @@ if is_fedora ; then
         exit 10
     fi
 
-# ubuntu, debian 
+# ubuntu, debian
 elif is_ubuntu ; then
     echo "BUBU: $os_VENDOR $os_RELEASE $os_CODENAME"
     # Check if ntp is running
@@ -209,7 +209,7 @@ elif is_ubuntu ; then
 
 elif is_suse ; then
     # TODO
-    echo "SUSE: TBD" 
+    echo "SUSE: TBD"
 
 # other distro's
 else
@@ -224,7 +224,7 @@ sleep 10
 # Now let's see if the VM is in sync with ntp server
 ntpq -p
 if [[ $? -ne 0 ]]; then
-    echoerr "Unable to query NTP deamon!"
+    echoerr "Unable to query NTP daemon!"
     exit 10
 fi
 # loopinfo returns the offset between the ntp server and internal clock
@@ -233,7 +233,7 @@ delay=$(ntpdc -c loopinfo | awk 'NR==1 {print $2}')
 # Using awk for float comparison
 check=$(echo "$delay $maxdelay" | awk '{if ($1 < $2) print 0; else print 1}')
 
-if [[ 0 -ne $check ]] ; then    
+if [[ 0 -ne $check ]] ; then
     echoerr "ERROR: NTP Time out of sync. Test Failed"
     echo "NTP offset is $delay seconds."
     exit 10

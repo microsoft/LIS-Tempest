@@ -43,7 +43,7 @@ class KVP(manager.LisBase):
             )
         self.host_name = ""
         self.instance_name = ""
-        self.deamon = "'[h]v_kvp_daemon\|[h]ypervkvpd'"
+        self.daemon = "'[h]v_kvp_daemon\|[h]ypervkvpd'"
         self.run_ssh = CONF.validation.run_validation and \
             self.image_utils.is_sshable_image(self.image_ref)
         self.ssh_user = CONF.validation.image_ssh_user
@@ -61,11 +61,11 @@ class KVP(manager.LisBase):
         self.verify_lis(self.instance_name, "'Key-Value Pair Exchange'")
         """ Check if KVP runs on the vm """
         try:
-            output = self.linux_client.verify_daemon(self.deamon)
-            LOG.info('KVP Deamon is running ${0}'.format(output))
+            output = self.linux_client.verify_daemon(self.daemon)
+            LOG.info('KVP daemon is running ${0}'.format(output))
             self.assertIsNotNone(output)
         except Exception:
-            LOG.exception('KVP Deamon ' + self.deamon + ' is not running!')
+            LOG.exception('KVP daemon ' + self.daemon + ' is not running!')
             self._log_console_output()
             raise
         self.check_kvp_basic(self.instance_name)
