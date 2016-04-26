@@ -20,7 +20,6 @@ from tempest.common.utils import data_utils
 from tempest.lis import manager
 from oslo_log import log as logging
 from tempest.scenario import utils as test_utils
-import time
 
 CONF = config.CONF
 
@@ -72,7 +71,7 @@ class Reboot(manager.LisBase):
             new_flavor = self.create_flavor(memory)
             self.servers_client.resize(self.server_id, new_flavor)
             waiters.wait_for_server_status(self.servers_client, self.server_id,
-                                                       'VERIFY_RESIZE')
+                                           'VERIFY_RESIZE')
             self.servers_client.confirm_resize(self.server_id)
             self.servers_client.reboot(self.server_id, 'SOFT')
             self._wait_for_server_status('ACTIVE')

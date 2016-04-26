@@ -17,10 +17,8 @@ import time
 import os
 
 from tempest import config
-from tempest import exceptions
 from tempest.lib import exceptions as lib_exc
 from tempest import test
-#from tempest.common import debug
 from tempest.common.utils.windows.remote_client import WinRemoteClient
 from tempest.lis import manager
 from oslo_log import log as logging
@@ -30,8 +28,8 @@ CONF = config.CONF
 
 LOG = logging.getLogger(__name__)
 
-MAXIMUM_DELAY = 7   #7 seconds
-SLEEP_TIME = 600    #600 seconds
+MAXIMUM_DELAY = 7   # 7 seconds
+SLEEP_TIME = 600    # 600 seconds
 
 
 class TimeSync(manager.LisBase):

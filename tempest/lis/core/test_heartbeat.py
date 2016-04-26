@@ -12,7 +12,6 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import time
 from tempest import config
 from oslo_log import log as logging
 from tempest.lis import manager
@@ -51,7 +50,6 @@ class HeartBeat(manager.LisBase):
                   'Run ssh: {ssh}, user: {ssh_user}'.format(
                       image=self.image_ref, flavor=self.flavor_ref,
                       ssh=self.run_ssh, ssh_user=self.ssh_user))
-
 
     @test.attr(type=['smoke', 'core'])
     @test.services('compute', 'network')

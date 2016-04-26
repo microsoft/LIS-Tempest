@@ -76,7 +76,8 @@ class TestLis(manager.ScenarioTest):
         """ Check if hv_vss_deamon runs on the vm """
         try:
             linux_client = self.get_remote_client(
-                ip_address=self.floating_ip['floatingip']['floating_ip_address'],
+                ip_address=self.floating_ip[
+                    'floatingip']['floating_ip_address'],
                 username=self.image_utils.ssh_user(self.image_ref),
                 private_key=self.keypair['private_key'])
             linux_client.create_file(self.filename)
@@ -92,7 +93,8 @@ class TestLis(manager.ScenarioTest):
         """ Create a file on the vm """
         try:
             linux_client = self.get_remote_client(
-                ip_address=self.floating_ip['floatingip']['floating_ip_address'],
+                ip_address=self.floating_ip[
+                    'floatingip']['floating_ip_address'],
                 username=self.image_utils.ssh_user(self.image_ref),
                 private_key=self.keypair['private_key'])
             linux_client.create_file(self.filename)
@@ -130,7 +132,8 @@ class TestLis(manager.ScenarioTest):
         """ Delete the file from the vm """
         try:
             linux_client = self.get_remote_client(
-                ip_address=self.floating_ip['floatingip']['floating_ip_address'],
+                ip_address=self.floating_ip[
+                    'floatingip']['floating_ip_address'],
                 username=self.image_utils.ssh_user(self.image_ref),
                 private_key=self.keypair['private_key'])
             linux_client.delete_file(self.filename)
@@ -167,7 +170,8 @@ class TestLis(manager.ScenarioTest):
         """ Verify if the file exists on the vm """
         try:
             linux_client = self.get_remote_client(
-                ip_address=self.floating_ip['floatingip']['floating_ip_address'],
+                ip_address=self.floating_ip[
+                    'floatingip']['floating_ip_address'],
                 username=self.image_utils.ssh_user(self.image_ref),
                 private_key=self.keypair['private_key'])
             output = linux_client.verify_file(self.filename)

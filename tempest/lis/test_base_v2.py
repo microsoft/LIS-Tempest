@@ -69,7 +69,7 @@ class TestLis(manager.ScenarioTest):
     def boot_instance(self):
         # Create server with image and flavor from input scenario
         security_groups = [self.security_group]
-      	self.instance = self.create_server(flavor=self.flavor_ref,
+        self.instance = self.create_server(flavor=self.flavor_ref,
                                            image_id=self.image_ref,
                                            key_name=self.keypair['name'],
                                            security_groups=security_groups,
@@ -79,17 +79,19 @@ class TestLis(manager.ScenarioTest):
         if self.run_ssh:
             # Obtain a floating IP
             floating_network_id = CONF.network.public_network_id
-            self.floating_ip = self.floating_ips_client.create_floatingip(floating_network_id=floating_network_id)
+            self.floating_ip = self.floating_ips_client.create_floatingip(
+                floating_network_id=floating_network_id)
             self.addCleanup(self.delete_wrapper,
-                    self.floating_ips_client.delete_floatingip,
-                    self.floating_ip['floatingip']['floating_ip_address'])
+                            self.floating_ips_client.delete_floatingip,
+                            self.floating_ip['floatingip']['floating_ip_address'])
             # Attach a floating IP
             self.compute_floating_ips_client.associate_floating_ip_to_server(
                 self.floating_ip['floatingip']['floating_ip_address'], self.instance['id'])
             # Check ssh
             try:
                 self.get_remote_client(
-                    ip_address=self.floating_ip['floatingip']['floating_ip_address'],
+                    ip_address=self.floating_ip[
+                        'floatingip']['floating_ip_address'],
                     username=self.image_utils.ssh_user(self.image_ref),
                     private_key=self.keypair['private_key'])
             except Exception:

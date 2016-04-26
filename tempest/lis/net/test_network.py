@@ -11,16 +11,13 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
-import netaddr
-import os
+
 from tempest import config
-from tempest.common.utils import data_utils
 from tempest.common.utils.windows.remote_client import WinRemoteClient
 from tempest.lis import manager
 from oslo_log import log as logging
 from tempest.scenario import utils as test_utils
 from tempest import test
-import pdb
 
 CONF = config.CONF
 
@@ -87,17 +84,19 @@ class Network(manager.LisBase):
         if self.run_ssh:
             # Obtain a floating IP
             floating_network_id = CONF.network.public_network_id
-            self.floating_ip = self.floating_ips_client.create_floatingip(floating_network_id=floating_network_id)
+            self.floating_ip = self.floating_ips_client.create_floatingip(
+                floating_network_id=floating_network_id)
             self.addCleanup(self.delete_wrapper,
-                    self.floating_ips_client.delete_floatingip,
-                    self.floating_ip['floatingip']['floating_ip_address'])
+                            self.floating_ips_client.delete_floatingip,
+                            self.floating_ip['floatingip']['floating_ip_address'])
             # Attach a floating IP
             self.compute_floating_ips_client.associate_floating_ip_to_server(
                 self.floating_ip['floatingip']['floating_ip_address'], self.instance['id'])
             # Check ssh
             try:
                 self.get_remote_client(
-                    ip_address=self.floating_ip['floatingip']['floating_ip_address'],
+                    ip_address=self.floating_ip[
+                        'floatingip']['floating_ip_address'],
                     username=self.image_utils.ssh_user(self.image_ref),
                     private_key=self.keypair['private_key'])
             except Exception:
@@ -109,17 +108,19 @@ class Network(manager.LisBase):
         if self.run_ssh:
             # Obtain a floating IP
             floating_network_id = CONF.network.public_network_id
-            self.floating_ip = self.floating_ips_client.create_floatingip(floating_network_id=floating_network_id)
+            self.floating_ip = self.floating_ips_client.create_floatingip(
+                floating_network_id=floating_network_id)
             self.addCleanup(self.delete_wrapper,
-                    self.floating_ips_client.delete_floatingip,
-                    self.floating_ip['floatingip']['floating_ip_address'])
+                            self.floating_ips_client.delete_floatingip,
+                            self.floating_ip['floatingip']['floating_ip_address'])
             # Attach a floating IP
             self.compute_floating_ips_client.associate_floating_ip_to_server(
                 self.floating_ip['floatingip']['floating_ip_address'], self.instance['id'])
             # Check lis presence
             try:
                 linux_client = self.get_remote_client(
-                    ip_address=self.floating_ip['floatingip']['floating_ip_address'],
+                    ip_address=self.floating_ip[
+                        'floatingip']['floating_ip_address'],
                     username=self.image_utils.ssh_user(self.image_ref),
                     private_key=self.keypair['private_key'])
 

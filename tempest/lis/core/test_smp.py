@@ -45,7 +45,7 @@ class ISS(manager.LisBase):
         self.instance_name = ""
         self.run_ssh = CONF.validation.run_validation and \
             self.image_utils.is_sshable_image(self.image_ref)
-	self.ssh_user = CONF.validation.image_ssh_user
+        self.ssh_user = CONF.validation.image_ssh_user
         LOG.debug('Starting test for i:{image}, f:{flavor}. '
                   'Run ssh: {ssh}, user: {ssh_user}'.format(
                       image=self.image_ref, flavor=self.flavor_ref,
@@ -85,7 +85,7 @@ class ISS(manager.LisBase):
     @test.services('compute')
     def test_vcpu_offline(self):
         self.spawn_vm()
-		# Define the number of CPU cores to be set on the instance
+        # Define the number of CPU cores to be set on the instance
         self._test_vcpu_offline_set(5)
         self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
                                     self.ssh_user, self.keypair['private_key'])

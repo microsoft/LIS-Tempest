@@ -14,7 +14,6 @@
 
 import os
 from tempest import config
-from tempest import exceptions
 from tempest.lib import exceptions as lib_exc
 from tempest import test
 from tempest.lis import manager
