@@ -1956,10 +1956,10 @@ class LisBase(ScenarioTest):
         # Create server with image and flavor from input scenario
         security_group = [self.security_group]
         self.instance = self.create_server(flavor=self.flavor_ref,
-                       image_id=self.image_ref,
+                                           image_id=self.image_ref,
                                            key_name=self.keypair['name'],
-                       security_groups=security_group,
-                       wait_until='ACTIVE')
+                                           security_groups=security_group,
+                                           wait_until='ACTIVE')
         self.instance_name = self.instance["OS-EXT-SRV-ATTR:instance_name"]
         self.host_name = self.instance["OS-EXT-SRV-ATTR:hypervisor_hostname"]
         self._initiate_host_client(self.host_name)

@@ -284,12 +284,16 @@ class RemoteClient(RemoteClientBase):
         cmd = "chmod 755 /tmp/kvp_client; "
         self.exec_command(cmd)
         cmd = "/tmp/kvp_client 0 | grep \"EEE; Value: 555\""
+
         """ kvp_client returned wrong exit code 4. Modified exec_command
             so it could ignore exit status to work around the problem.
 
         """
-        return self.exec_command(cmd, ignore_exit_status=True)
-
+        output = self.exec_command(cmd, ignore_exit_status=True)
+        if "Value: 555" in output:
+            return(output)
+        else:
+            raise Exception("Invalid KVP: " + output)
 
 class FedoraUtils(RemoteClient):
 
