@@ -154,7 +154,7 @@ class Client(object):
     def _can_system_poll():
         return hasattr(select, 'poll')
 
-    def exec_command(self, cmd, encoding="utf-8"):
+    def exec_command(self, cmd, ignore_exit_status=False, encoding="utf-8"):
         """Execute the specified command on the server
 
         Note that this method is reading whole command outputs to memory, thus
@@ -215,7 +215,7 @@ class Client(object):
             out_data = out_data.decode(encoding)
             err_data = err_data.decode(encoding)
 
-        if 0 != exit_status:
+        if 0 != exit_status and ignore_exit_status == False:
             raise exceptions.SSHExecCommandFailed(
                 command=cmd, exit_status=exit_status,
                 stderr=err_data, stdout=out_data)

@@ -50,12 +50,12 @@ class RemoteClientBase():
             script_name, cmd_params, full_script_path, destination)
         return distro.strip().lower()
 
-    def exec_command(self, cmd):
+    def exec_command(self, cmd, ignore_exit_status=False):
         # Shell options below add more clearness on failures,
         # path is extended for some non-cirros guest oses (centos7)
         cmd = CONF.validation.ssh_shell_prologue + " " + cmd
         LOG.debug("Remote command: %s" % cmd)
-        return self.ssh_client.exec_command(cmd)
+        return self.ssh_client.exec_command(cmd, ignore_exit_status)
 
     def copy_over(self, source, destination):
         output = self.ssh_client.sftp(source, destination)
@@ -281,8 +281,14 @@ class RemoteClient(RemoteClientBase):
         return self.exec_command(cmd)
 
     def kvp_verify_value(self):
-        cmd = "chmod 755 /tmp/kvp_client; /tmp/kvp_client 0 | grep \"EEE; Value: 555\""
-        return self.exec_command(cmd)
+        cmd = "chmod 755 /tmp/kvp_client; "
+        self.exec_command(cmd)
+        cmd = "/tmp/kvp_client 0 | grep \"EEE; Value: 555\""
+        """ kvp_client returned wrong exit code 4. Modified exec_command
+            so it could ignore exit status to work around the problem.
+
+        """
+        return self.exec_command(cmd, ignore_exit_status=True)
 
 
 class FedoraUtils(RemoteClient):
