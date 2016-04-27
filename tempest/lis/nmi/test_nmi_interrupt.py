@@ -110,6 +110,11 @@ class nmi(manager.LisBase):
 	self.unsave_vm(self.server_id)
         self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
                                     self.ssh_user, self.keypair['private_key'])
+        self.pause_vm(self.server_id)
+	self.send_nmi_interrupt_change_status(self.instance_name)
+	self.unpause_vm(self.server_id)
+        self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
+                                    self.ssh_user, self.keypair['private_key'])
         self.servers_client.delete_server(self.instance['id'])
 
     @test.attr(type=['smoke', 'nmi'])
