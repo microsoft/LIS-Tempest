@@ -73,12 +73,15 @@ class KVP(manager.LisBase):
 
     @test.attr(type=['smoke', 'core', 'kvp'])
     @test.services('compute', 'network')
-    def test_kvp_add_Key_Values(self):
+    def test_kvp_Key_Values(self):
         self.spawn_vm()
         self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
                                     self.ssh_user, self.keypair['private_key'])
         self.verify_lis(self.instance_name, "'Key-Value Pair Exchange'")
         self.send_kvp_client()
-        self.kvp_add_value(self.instance_name)
-        self.linux_client.kvp_verify_value()
+        self.kvp_add_value(self.instance_name, 'EEE', '555', '0')
+        self.linux_client.kvp_verify_value('EEE', '555', '0')
+        self.kvp_modify_value(self.instance_name, 'EEE', '999', '0')
+        self.linux_client.kvp_verify_value('EEE', '999', '0')
+        self.kvp_remove_value(self.instance_name, 'EEE', '999', '0')
         self.servers_client.delete_server(self.instance['id'])

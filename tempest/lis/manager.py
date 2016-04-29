@@ -1766,16 +1766,38 @@ class LisBase(ScenarioTest):
             hvServer=self.host_name,
             vmName=instance_name)
 
-    def kvp_add_value(self, instance_name):
+    def kvp_add_value(self, instance_name, key, value, pool):
         script_location = "%s%s" % (self.script_folder,
                                     'setupscripts\\kvp_add_value.ps1')
         self.host_client.run_powershell_cmd(
             script_location,
             hvServer=self.host_name,
             vmName=instance_name,
-            key='EEE',
-            Value='555',
-            Pool='0')
+            key=key,
+            Value=value,
+            Pool=pool)
+
+    def kvp_modify_value(self, instance_name, key, value, pool):
+        script_location = "%s%s" % (self.script_folder,
+                                    'setupscripts\\kvp_modify_value.ps1')
+        self.host_client.run_powershell_cmd(
+            script_location,
+            hvServer=self.host_name,
+            vmName=instance_name,
+            key=key,
+            Value=value,
+            Pool=pool)
+
+    def kvp_remove_value(self, instance_name, key, value, pool):
+        script_location = "%s%s" % (self.script_folder,
+                                    'setupscripts\\kvp_remove_value.ps1')
+        self.host_client.run_powershell_cmd(
+            script_location,
+            hvServer=self.host_name,
+            vmName=instance_name,
+            key=key,
+            Value=value,
+            Pool=pool)
 
     def change_cpu(self, instance_name, new_cpu_count):
         """Change the vcpu of a vm"""
