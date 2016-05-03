@@ -1500,6 +1500,7 @@ class ObjectStorageScenarioTest(ScenarioTest):
         _, obj = self.object_client.get_object(container_name, obj_name)
         self.assertEqual(obj, expected_data)
 
+
 class LisBase(ScenarioTest):
 
     def setUp(self):
@@ -1729,8 +1730,6 @@ class LisBase(ScenarioTest):
             hvServer=self.host_name,
             vmName=instance_name)
 
-        iso_name = instance_name + '.iso'
-
     def get_parent_disk_size(self, disk_name):
 
         script_location = "%s%s" % (self.script_folder,
@@ -1947,7 +1946,6 @@ class LisBase(ScenarioTest):
         my_path = os.path.abspath(
             os.path.normpath(os.path.dirname(__file__)))
         full_script_path = my_path + script_path
-        cmd_params = []
         self.linux_client.copy_over(full_script_path, destination)
 
     def get_vm_time(self):
@@ -1976,11 +1974,12 @@ class LisBase(ScenarioTest):
 
     def boot_instance(self):
         # Create server with image and flavor from input scenario
-        security_group = [self.security_group]
+        security_group = self._create_security_group()
+        security_groups = [{'name': security_group['name']}]
         self.instance = self.create_server(flavor=self.flavor_ref,
                                            image_id=self.image_ref,
                                            key_name=self.keypair['name'],
-                                           security_groups=security_group,
+                                           security_groups=security_groups,
                                            wait_until='ACTIVE')
         self.instance_name = self.instance["OS-EXT-SRV-ATTR:instance_name"]
         self.host_name = self.instance["OS-EXT-SRV-ATTR:hypervisor_hostname"]
@@ -1988,18 +1987,19 @@ class LisBase(ScenarioTest):
 
     def nova_floating_ip_create(self):
         floating_network_id = CONF.network.public_network_id
-        self.floating_ip = self.floating_ips_client.create_floatingip(floating_network_id=floating_network_id)
+        self.floating_ip = self.floating_ips_client.create_floatingip(
+            floating_network_id=floating_network_id)
         self.addCleanup(self.delete_wrapper,
                         self.floating_ips_client.delete_floatingip,
                         self.floating_ip['floatingip']['id'])
 
     def nova_floating_ip_add(self):
         self.compute_floating_ips_client.associate_floating_ip_to_server(
-            self.floating_ip['floatingip']['floating_ip_address'], self.instance['id'])
+            self.floating_ip['floatingip']['floating_ip_address'],
+            self.instance['id'])
 
     def spawn_vm(self):
         self.add_keypair()
-        self.security_group = self._create_security_group()
         self.boot_instance()
         self.nova_floating_ip_create()
         self.nova_floating_ip_add()
