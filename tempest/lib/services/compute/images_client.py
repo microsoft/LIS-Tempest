@@ -132,7 +132,8 @@ class ImagesClient(base_compute_client.BaseComputeClient):
 
     def is_resource_deleted(self, id):
         try:
-            self.show_image(id)
+            if self.show_image(id)['image']['status'] == 'DELETED':
+                return True
         except lib_exc.NotFound:
             return True
         return False
