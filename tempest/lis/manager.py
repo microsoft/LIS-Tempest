@@ -1757,6 +1757,22 @@ class LisBase(ScenarioTest):
             hvServer=self.host_name,
             vmName=instance_name)
 
+    def send_nmi_interrupt_change_status(self, instance_name):
+        script_location = "%s%s" % (self.script_folder,
+                                    'setupscripts\\nmi_inject_interrupt.ps1')
+        self.host_client.run_powershell_cmd(
+            script_location,
+            hvServer=self.host_name,
+            vmName=instance_name)
+
+    def send_nmi_unprivileged(self, instance_name):
+        script_location = "%s%s" % (self.script_folder,
+                                    'setupscripts\\nmi_send_unprivileged.ps1')
+        self.host_client.run_powershell_cmd(
+            script_location,
+            hvServer=self.host_name,
+            vmName=instance_name)
+
     def check_kvp_basic(self, instance_name):
         script_location = "%s%s" % (self.script_folder,
                                     'setupscripts\\kvp_basic.ps1')
