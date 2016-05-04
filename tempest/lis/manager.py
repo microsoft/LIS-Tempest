@@ -1969,6 +1969,39 @@ class LisBase(ScenarioTest):
                                 'error': s_err})
         return int(s_out)
 
+    def create_server_snapshot_nocleanup(self, server, name=None):
+        # Glance client
+        _image_client = self.image_client
+        # Compute client
+        _images_client = self.compute_images_client
+        if name is None:
+            name = data_utils.rand_name('scenario-snapshot')
+        LOG.debug("Creating a snapshot image for server: %s", server['name'])
+        image = _images_client.create_image(server['id'], name=name)
+        image_id = image.response['location'].split('images/')[1]
+        _image_client.wait_for_image_status(image_id, 'active')
+        snapshot_image = _image_client.get_image_meta(image_id)
+
+        bdm = snapshot_image.get('properties', {}).get('block_device_mapping')
+        if bdm:
+            bdm = json.loads(bdm)
+            if bdm and 'snapshot_id' in bdm[0]:
+                snapshot_id = bdm[0]['snapshot_id']
+                self.addCleanup(
+                    self.snapshots_client.wait_for_resource_deletion,
+                    snapshot_id)
+                self.addCleanup(
+                    self.delete_wrapper, self.snapshots_client.delete_snapshot,
+                    snapshot_id)
+                waiters.wait_for_snapshot_status(self.snapshots_client,
+                                                 snapshot_id, 'available')
+
+        image_name = snapshot_image['name']
+        self.assertEqual(name, image_name)
+        LOG.debug("Created snapshot image %s for server %s",
+                  image_name, server['name'])
+        return snapshot_image
+
     def add_keypair(self):
         self.keypair = self.create_keypair()
 

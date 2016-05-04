@@ -109,11 +109,10 @@ class LisNext(manager.LisBase):
                                     self.ssh_user, self.keypair['private_key'])
         self.install_lis_next()
         self.stop_vm(self.server_id)
-        snapshot_image = self.create_server_snapshot(
+        snapshot_image = self.create_server_snapshot_nocleanup(
             server=self.instance)
         # boot a second instance from the snapshot
         self.image_ref = snapshot_image['id']
-        print "================================img_ref: ", self.image_ref
         self.servers_client.delete_server(self.instance['id'])
         self.spawn_vm()
         self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
