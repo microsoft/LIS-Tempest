@@ -1877,6 +1877,59 @@ class LisBase(ScenarioTest):
             VMName=instance_name,
             StartupBytes=new_memory * 1024 * 1024)
 
+    def set_dynamic_memory(self, instance_name, startup_memory, min_memory,
+                           max_memory, mem_weight):
+        if not isinstance(startup_memory, int):
+            startup_memory = self.convert_memory_size(startup_memory)
+        else:
+            startup_memory = startup_memory * 1024 * 1024
+        if not isinstance(min_memory, int):
+            min_memory = self.convert_memory_size(min_memory)
+        else:
+            min_memory = min_memory * 1024 * 1024
+        if not isinstance(max_memory, int):
+            max_memory = self.convert_memory_size(max_memory)
+        else:
+            max_memory = max_memory * 1024 * 1024
+
+        self.host_client.run_powershell_cmd(
+            'Set-VMMemory',
+            ComputerName=self.host_name,
+            VMName=instance_name,
+            DynamicMemoryEnabled='$true',
+            StartupBytes=startup_memory,
+            MinimumBytes=min_memory,
+            MaximumBytes=max_memory,
+            Priority=mem_weight)
+
+    def convert_memory_size(self, memory):
+        if memory.endswith('MB'):
+            memory = memory.replace('MB', '')
+            memory = long(memory)
+            memory_size = memory * 1024 * 1024
+        elif memory.endswith('GB'):
+            memory = memory.replace('GB', '')
+            memory = long(memory)
+            memory_size = memory * 1024 * 1024 * 1024
+        elif memory.endswith('%'):
+            cmd = "$osInfo = Get-WMIObject Win32_OperatingSystem; "
+            cmd += "$osInfo.FreePhysicalMemory * 1KB"
+            host_mem_capacity = self.host_client.run_powershell_cmd(cmd)
+            host_mem_capacity = long(host_mem_capacity)
+            memory = memory.replace('%', '')
+            memory = float(memory)
+            memory = memory / 100
+            memory_size = memory * host_mem_capacity
+            memory_size = long(memory_size)
+            memory_size_mega = memory_size / 1024 / 1024
+            if (memory_size_mega % 2) != 0:
+                memory_size_mega -= 1
+            memory_size = memory_size_mega * 1024 * 1024
+        else:
+            memory_size = memory
+
+        return memory_size
+
     def check_heartbeat_status(self, instance_name):
         s_out = self.host_client.get_powershell_cmd_attribute(
             'Get-VMIntegrationService', 'PrimaryStatusDescription',

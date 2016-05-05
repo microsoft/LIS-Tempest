@@ -232,8 +232,8 @@ class RemoteClient(RemoteClientBase):
             LOG.info("Contents of /dev: %s" % self.exec_command(cmd_why))
             raise
 
-    def verify_lis_modules(self):
-        command = 'lsmod | grep hv_ | wc -l'
+    def verify_lis_module(self, module):
+        command = 'lsmod | grep {module} | wc -l'.format(module=module)
         output = self.exec_command(command)
         return int(output)
 
