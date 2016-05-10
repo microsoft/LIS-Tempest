@@ -111,7 +111,9 @@ class FileCopy(manager.LisBase):
         file_size = self.linux_client.check_file_size('/tmp/' + self.test_file)
         if file_size != test_size:
             self.remove_file(self.file_path)
-            raise Exception("ERROR: The file doesn't match the 10MB size!")
+            raise Exception("ERROR: The file doesn't " +
+                            "match the {size} size!").format(size=size)
+
         self.remove_file(self.file_path)
         self.servers_client.delete_server(self.instance['id'])
 
@@ -146,7 +148,8 @@ class FileCopy(manager.LisBase):
         file_size = self.linux_client.check_file_size('/tmp/' + self.test_file)
         if file_size != test_size:
             self.remove_file(self.file_path)
-            raise Exception("ERROR: The file doesn't match the 10MB size!")
+            raise Exception("ERROR: The file doesn't " +
+                            "match the {size} size!").format(size=size)
 
         out, error, code = self.copy_vmfile(self.instance_name, self.file_path)
         if code != 1:
@@ -160,6 +163,44 @@ class FileCopy(manager.LisBase):
             self.remove_file(self.file_path)
             raise Exception(
                 "ERROR: Couldn't overwrite the file: " + error + ', ' + code)
+
+        self.remove_file(self.file_path)
+        self.servers_client.delete_server(self.instance['id'])
+
+    @test.attr(type=['smoke', 'core', 'filecopy', 'large'])
+    @test.services('compute', 'network')
+    def test_fcopy_large(self):
+        self.spawn_vm()
+        self._initiate_linux_client(
+            self.floating_ip['floatingip']['floating_ip_address'],
+            self.ssh_user, self.keypair['private_key'])
+
+        # Verify if Guest Service is enabled. If not, we enable it
+        status = self.verify_lis(self.instance_name, "'Guest Service Interface'")
+        if status == 'false':
+            self.stop_vm(self.server_id)
+            self.enable_lis(self.instance_name, "'Guest Service Interface'")
+            self.start_vm(self.server_id)
+            self._initiate_linux_client(
+                self.floating_ip['floatingip']['floating_ip_address'],
+                self.ssh_user, self.keypair['private_key'])
+
+        self.verify_lis_status(self.instance_name, "'Guest Service Interface'")
+        self.linux_client.verify_daemon("'[h]v_fcopy_daemon\|[h]ypervfcopyd'")
+        size = '6GB'
+        test_size = self._create_test_file(size)
+
+        out, error, code = self.copy_vmfile(self.instance_name, self.file_path)
+        if code != 0:
+            self.remove_file(self.file_path)
+            raise Exception(
+                "ERROR: Couldn't copy the file: " + error + ', ' + code)
+
+        file_size = self.linux_client.check_file_size('/tmp/' + self.test_file)
+        if file_size != test_size:
+            self.remove_file(self.file_path)
+            raise Exception("ERROR: The file doesn't " +
+                            "match the {size} size!").format(size=size)
 
         self.remove_file(self.file_path)
         self.servers_client.delete_server(self.instance['id'])
