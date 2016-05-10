@@ -93,4 +93,3 @@ class WinRemoteClient(object):
         LOG.info('Command %(cmd)s result: %(output)s',
                  {'cmd': full_cmd, 'output': s_out})
         return s_out
-

@@ -222,7 +222,7 @@ fi
 sleep 10
 
 # Now let's see if the VM is in sync with ntp server
-ntpq -p
+sudo ntpq -p
 if [[ $? -ne 0 ]]; then
     echoerr "Unable to query NTP daemon!"
     exit 10
@@ -242,4 +242,3 @@ fi
 # If we reached this point, time is synced.
 echo "NTP offset is $delay seconds."
 echo "SUCCES: NTP time synced!"
-

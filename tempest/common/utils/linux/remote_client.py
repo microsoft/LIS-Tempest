@@ -264,6 +264,10 @@ class RemoteClient(RemoteClientBase):
         cmd = ' [ -f %s ] && echo 1 || echo 0' % file_name
         return int(self.exec_command(cmd))
 
+    def check_file_size(self, file_name):
+        cmd = 'wc -c < %s' % file_name
+        return int(self.exec_command(cmd))
+
     def get_unix_time(self):
         command = 'date +%s'
         output = self.exec_command(command)

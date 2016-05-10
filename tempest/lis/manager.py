@@ -1841,6 +1841,36 @@ class LisBase(ScenarioTest):
             VMName=instance_name,
             Name=snapshot_name)
 
+    def default_vhd_path(self):
+        s_out = self.host_client.get_powershell_cmd_attribute(
+            'Get-VMHost', 'VirtualHardDiskPath',
+            ComputerName=self.host_name)
+        return s_out
+
+    def copy_vmfile(self, instance_name, file_path, overwrite=False):
+        """ Copy file to VM from host using Guest Integration Services. """
+
+        if overwrite is True:
+            force = '-Force'
+        else:
+            force = ''
+
+        cmd = ('powershell " Copy-VMFile {force} -ComputerName {host_name} '
+               '-vmName {instance_name} -SourcePath \'{file_path}\' '
+               '-FileSource host -DestinationPath \'/tmp/\' "').format(
+            host_name=self.host_name, instance_name=instance_name,
+            file_path=file_path, force=force)
+        s_out, s_err, r_code = self.host_client.run_wsman_cmd(cmd)
+
+        return s_out, s_err, r_code
+
+    def remove_file(self, file_path):
+        """ Remove created files from host. """
+
+        self.host_client.run_powershell_cmd(
+            'Remove-Item -Force',
+            Path="'{file_path}'".format(file_path=file_path))
+
     def verify_lis(self, instance_name, service):
         s_out = self.host_client.get_powershell_cmd_attribute(
             'Get-VMIntegrationService', 'Enabled',
@@ -1850,6 +1880,18 @@ class LisBase(ScenarioTest):
 
         assert_msg = '${0} disabled for VM ${1}'.format(service, instance_name)
         self.assertTrue(s_out.lower() != 'True', assert_msg)
+        return s_out.lower().strip()
+
+    def verify_lis_status(self, instance_name, service):
+        s_out = self.host_client.get_powershell_cmd_attribute(
+            'Get-VMIntegrationService', 'OperationalStatus',
+            ComputerName=self.host_name,
+            VMName=instance_name,
+            Name=service)
+
+        assert_msg = '${0} is not operational for VM ${1}'.format(
+            service, instance_name)
+        self.assertTrue(s_out.lower() != 'Ok', assert_msg)
         return s_out.lower().strip()
 
     def enable_lis(self, instance_name, service):
