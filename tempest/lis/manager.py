@@ -15,6 +15,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import time
 import subprocess
 import os
 import netaddr
@@ -29,7 +30,6 @@ from tempest.common import waiters
 from tempest import config
 from tempest import exceptions
 from tempest.lib.common.utils import misc as misc_utils
-from tempest.common.utils.linux import factory as osutils_factory
 from tempest.common.utils.windows.remote_client import WinRemoteClient
 from tempest.lib import exceptions as lib_exc
 from tempest.services.network import resources as net_resources
@@ -1863,6 +1863,33 @@ class LisBase(ScenarioTest):
         s_out, s_err, r_code = self.host_client.run_wsman_cmd(cmd)
 
         return s_out, s_err, r_code
+
+    def create_test_file(self, size):
+        vhd_path = self.default_vhd_path()
+        vhd_path = vhd_path.rstrip()
+        vhd_path = vhd_path + "\\"
+        self.test_file = "testfile-" + time.strftime("%d-%m-%Y-%H-%M-%S") + ".file"
+        self.file_path = vhd_path + self.test_file
+        if size.endswith('MB'):
+            size = size.replace('MB', '')
+            size = long(size)
+            size = size * 1024 * 1024
+        elif size.endswith('GB'):
+            size = size.replace('GB', '')
+            size = long(size)
+            size = size * 1024 * 1024 * 1024
+        else:
+            size = long(size)
+
+        cmd = "fsutil file createnew '{file_path}' {size}".format(
+            file_path=self.file_path, size=size)
+        out = self.host_client.run_powershell_cmd(cmd)
+        if "is created" not in out:
+            raise Exception("ERROR: Could not create file " + self.file_path)
+
+        self.addCleanup(self.remove_file, self.file_path)
+
+        return size
 
     def remove_file(self, file_path):
         """ Remove created files from host. """

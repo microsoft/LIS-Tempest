@@ -54,31 +54,6 @@ class FileCopy(manager.LisBase):
                       image=self.image_ref, flavor=self.flavor_ref,
                       ssh=self.run_ssh, ssh_user=self.ssh_user))
 
-    def _create_test_file(self, size):
-        vhd_path = self.default_vhd_path()
-        vhd_path = vhd_path.rstrip()
-        vhd_path = vhd_path + "\\"
-        self.test_file = "testfile-" + time.strftime("%d-%m-%Y-%H-%M-%S") + ".file"
-        self.file_path = vhd_path + self.test_file
-        if size.endswith('MB'):
-            size = size.replace('MB', '')
-            size = long(size)
-            size = size * 1024 * 1024
-        elif size.endswith('GB'):
-            size = size.replace('GB', '')
-            size = long(size)
-            size = size * 1024 * 1024 * 1024
-        else:
-            size = long(size)
-
-        cmd = "fsutil file createnew '{file_path}' {size}".format(
-            file_path=self.file_path, size=size)
-        out = self.host_client.run_powershell_cmd(cmd)
-        if "is created" not in out:
-            raise Exception("ERROR: Could not create file " + self.file_path)
-
-        return size
-
     @test.attr(type=['smoke', 'core', 'filecopy', 'guest'])
     @test.services('compute', 'network')
     def test_fcopy_basic(self):
@@ -88,7 +63,8 @@ class FileCopy(manager.LisBase):
             self.ssh_user, self.keypair['private_key'])
 
         # Verify if Guest Service is enabled. If not, we enable it
-        status = self.verify_lis(self.instance_name, "'Guest Service Interface'")
+        status = self.verify_lis(
+            self.instance_name, "'Guest Service Interface'")
         if status == 'false':
             self.stop_vm(self.server_id)
             self.enable_lis(self.instance_name, "'Guest Service Interface'")
@@ -100,21 +76,16 @@ class FileCopy(manager.LisBase):
         self.verify_lis_status(self.instance_name, "'Guest Service Interface'")
         self.linux_client.verify_daemon("'[h]v_fcopy_daemon\|[h]ypervfcopyd'")
         size = '10MB'
-        test_size = self._create_test_file(size)
+        test_size = self.create_test_file(size)
 
-        out, error, code = self.copy_vmfile(self.instance_name, self.file_path)
-        if code != 0:
-            self.remove_file(self.file_path)
-            raise Exception(
-                "ERROR: Couldn't copy the file: " + error + ', ' + code)
+        out, err, code = self.copy_vmfile(self.instance_name, self.file_path)
+        self.assertTrue(code == 0,
+                        "ERROR {code}: Couldn't copy the file: {err}".format(code=code, err=err))
 
         file_size = self.linux_client.check_file_size('/tmp/' + self.test_file)
-        if file_size != test_size:
-            self.remove_file(self.file_path)
-            raise Exception("ERROR: The file doesn't " +
-                            "match the {size} size!").format(size=size)
+        self.assertTrue(file_size == test_size,
+                        "ERROR: File size {size} mismatch!".format(size=size))
 
-        self.remove_file(self.file_path)
         self.servers_client.delete_server(self.instance['id'])
 
     @test.attr(type=['smoke', 'core', 'filecopy', 'guest', 'exists'])
@@ -126,7 +97,8 @@ class FileCopy(manager.LisBase):
             self.ssh_user, self.keypair['private_key'])
 
         # Verify if Guest Service is enabled. If not, we enable it
-        status = self.verify_lis(self.instance_name, "'Guest Service Interface'")
+        status = self.verify_lis(
+            self.instance_name, "'Guest Service Interface'")
         if status == 'false':
             self.stop_vm(self.server_id)
             self.enable_lis(self.instance_name, "'Guest Service Interface'")
@@ -138,33 +110,24 @@ class FileCopy(manager.LisBase):
         self.verify_lis_status(self.instance_name, "'Guest Service Interface'")
         self.linux_client.verify_daemon("'[h]v_fcopy_daemon\|[h]ypervfcopyd'")
         size = '10MB'
-        test_size = self._create_test_file(size)
+        test_size = self.create_test_file(size)
 
-        out, error, code = self.copy_vmfile(self.instance_name, self.file_path)
-        if code != 0:
-            self.remove_file(self.file_path)
-            raise Exception(
-                "ERROR: Couldn't copy the file: " + error + ', ' + code)
+        out, err, code = self.copy_vmfile(self.instance_name, self.file_path)
+        self.assertTrue(code == 0,
+                        "ERROR {code}: Couldn't copy the file: {err}".format(code=code, err=err))
         file_size = self.linux_client.check_file_size('/tmp/' + self.test_file)
-        if file_size != test_size:
-            self.remove_file(self.file_path)
-            raise Exception("ERROR: The file doesn't " +
-                            "match the {size} size!").format(size=size)
+        self.assertTrue(file_size == test_size,
+                        "ERROR: File size {size} mismatch!".format(size=size))
 
-        out, error, code = self.copy_vmfile(self.instance_name, self.file_path)
-        if code != 1:
-            self.remove_file(self.file_path)
-            raise Exception(
-                "ERROR: Could copy the file: " + error + ', ' + code)
+        out, err, code = self.copy_vmfile(self.instance_name, self.file_path)
+        self.assertTrue(code == 1,
+                        "ERROR {code}: Could copy the file: {err}".format(code=code, err=err))
 
-        out, error, code = self.copy_vmfile(
+        out, err, code = self.copy_vmfile(
             self.instance_name, self.file_path, overwrite=True)
-        if code != 0:
-            self.remove_file(self.file_path)
-            raise Exception(
-                "ERROR: Couldn't overwrite the file: " + error + ', ' + code)
+        self.assertTrue(code == 0,
+                        "ERROR {code}: Couldn't overwrite the file: {err}".format(code=code, err=err))
 
-        self.remove_file(self.file_path)
         self.servers_client.delete_server(self.instance['id'])
 
     @test.attr(type=['smoke', 'core', 'filecopy', 'large'])
@@ -176,7 +139,8 @@ class FileCopy(manager.LisBase):
             self.ssh_user, self.keypair['private_key'])
 
         # Verify if Guest Service is enabled. If not, we enable it
-        status = self.verify_lis(self.instance_name, "'Guest Service Interface'")
+        status = self.verify_lis(
+            self.instance_name, "'Guest Service Interface'")
         if status == 'false':
             self.stop_vm(self.server_id)
             self.enable_lis(self.instance_name, "'Guest Service Interface'")
@@ -188,19 +152,14 @@ class FileCopy(manager.LisBase):
         self.verify_lis_status(self.instance_name, "'Guest Service Interface'")
         self.linux_client.verify_daemon("'[h]v_fcopy_daemon\|[h]ypervfcopyd'")
         size = '6GB'
-        test_size = self._create_test_file(size)
+        test_size = self.create_test_file(size)
 
-        out, error, code = self.copy_vmfile(self.instance_name, self.file_path)
-        if code != 0:
-            self.remove_file(self.file_path)
-            raise Exception(
-                "ERROR: Couldn't copy the file: " + error + ', ' + code)
+        out, err, code = self.copy_vmfile(self.instance_name, self.file_path)
+        self.assertTrue(code == 0,
+                        "ERROR {code}: Couldn't copy the file: {err}".format(code=code, err=err))
 
         file_size = self.linux_client.check_file_size('/tmp/' + self.test_file)
-        if file_size != test_size:
-            self.remove_file(self.file_path)
-            raise Exception("ERROR: The file doesn't " +
-                            "match the {size} size!").format(size=size)
+        self.assertTrue(file_size == test_size,
+                        "ERROR: File size {size} mismatch!".format(size=size))
 
-        self.remove_file(self.file_path)
         self.servers_client.delete_server(self.instance['id'])
