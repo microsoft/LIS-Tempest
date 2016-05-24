@@ -24,10 +24,10 @@ CONF = config.CONF
 LOG = logging.getLogger(__name__)
 
 
-class ISS(manager.LisBase):
+class IntegratedShutdown(manager.LisBase):
 
     def setUp(self):
-        super(ISS, self).setUp()
+        super(IntegratedShutdown, self).setUp()
         # Setup image and flavor the test instance
         # Support both configured and injected values
         if not hasattr(self, 'image_ref'):
@@ -63,9 +63,9 @@ class ISS(manager.LisBase):
         status = self.verify_lis(self.instance_name, 'Shutdown')
         self.assertTrue('true' == status, 'Failed to enable iss.')
 
-    @test.attr(type=['smoke', 'core', 'iss'])
+    @test.attr(type=['smoke', 'core', 'iss', 'shutdown'])
     @test.services('compute', 'network')
-    def test_iss(self):
+    def test_shutdown(self):
         self.spawn_vm()
         self.stop_vm(self.server_id)
         self.start_vm(self.server_id)
@@ -78,8 +78,8 @@ class ISS(manager.LisBase):
             LOG.exception(exc)
             raise exc
 
-    @test.attr(type=['core', 'iss'])
+    @test.attr(type=['core', 'iss', 'shutdown'])
     @test.services('compute', 'network')
-    def test_iss_reload(self):
+    def test_shutdown_reload(self):
         self.spawn_vm()
         self._verify_integrated_shutdown_services()

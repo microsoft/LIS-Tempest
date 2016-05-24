@@ -23,10 +23,10 @@ CONF = config.CONF
 LOG = logging.getLogger(__name__)
 
 
-class ISS(manager.LisBase):
+class IntegratedShutdown(manager.LisBase):
 
     def setUp(self):
-        super(ISS, self).setUp()
+        super(IntegratedShutdown, self).setUp()
         # Setup image and flavor the test instance
         # Support both configured and injected values
         if not hasattr(self, 'image_ref'):
