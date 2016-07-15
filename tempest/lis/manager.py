@@ -1814,6 +1814,14 @@ class LisBase(ScenarioTest):
             Value=value,
             Pool=pool)
 
+    def get_cpu_settings(self, instance_name):
+        s_out = self.host_client.get_powershell_cmd_attribute(
+            'Get-VM', 'ProcessorCount',
+            ComputerName=self.host_name,
+            VMName=instance_name)
+
+        return int(s_out)
+
     def change_cpu(self, instance_name, new_cpu_count):
         """Change the vcpu of a vm"""
 
@@ -1938,6 +1946,16 @@ class LisBase(ScenarioTest):
             ComputerName=self.host_name,
             VMName=self.instance_name,
             Name=service)
+
+    def get_ram_settings(self, instance_name):
+        s_out = self.host_client.get_powershell_cmd_attribute(
+            'Get-VMMemory', 'Startup',
+            ComputerName=self.host_name,
+            VMName=instance_name)
+
+        memory_size = long(s_out)
+        memory_size = memory_size / 1024 / 1024
+        return memory_size
 
     def set_ram_settings(self, instance_name, new_memory):
         self.host_client.run_powershell_cmd(

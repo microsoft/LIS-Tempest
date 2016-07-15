@@ -116,6 +116,10 @@ class RemoteClient(RemoteClientBase):
         boot_time = time.time() - int(boot_secs)
         return time.localtime(boot_time)
 
+    def get_kernel_version(self):
+        output = self.exec_command('uname -r')
+        return output
+
     def write_to_console(self, message):
         message = re.sub("([$\\`])", "\\\\\\\\\\1", message)
         # usually to /dev/ttyS0
