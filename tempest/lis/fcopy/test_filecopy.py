@@ -162,3 +162,44 @@ class FileCopy(manager.LisBase):
                         "ERROR: File size {size} mismatch!".format(size=size))
 
         self.servers_client.delete_server(self.instance['id'])
+
+    @test.attr(type=['core', 'fcopy'])
+    @test.services('compute', 'network')
+    def test_fcopy_repeated_delete(self):
+        self.spawn_vm()
+        self._initiate_linux_client(
+            self.floating_ip['floatingip']['floating_ip_address'],
+            self.ssh_user, self.keypair['private_key'])
+
+        # Verify if Guest Service is enabled. If not, we enable it
+        status = self.verify_lis(
+            self.instance_name, "'Guest Service Interface'")
+        if status == 'false':
+            self.stop_vm(self.server_id)
+            self.enable_lis(self.instance_name, "'Guest Service Interface'")
+            self.start_vm(self.server_id)
+            self._initiate_linux_client(
+                self.floating_ip['floatingip']['floating_ip_address'],
+                self.ssh_user, self.keypair['private_key'])
+
+        self.verify_lis_status(self.instance_name, "'Guest Service Interface'")
+        self.linux_client.verify_daemon("'[h]v_fcopy_daemon\|[h]ypervfcopyd'")
+
+        # Create test file
+        size = '2GB'
+        test_size = self.create_test_file(size)
+
+        # Do repeated copy of the file on VM
+        for turn in xrange(4):
+            LOG.info('Copy file- turn {turn}'.format(turn=turn))
+            out, err, code = self.copy_vmfile(self.instance_name, self.file_path)
+            self.assertTrue(code == 0,
+                            "ERROR {code}: Couldn't copy the file: {err}".format(code=code, err=err))
+
+            file_size = self.linux_client.check_file_size('/tmp/' + self.test_file)
+            self.assertTrue(file_size == test_size,
+                            "ERROR: File size {size} mismatch!".format(size=size))
+
+            # delete the file from the VM
+            self.linux_client.delete_file('/tmp/{file}'.format(file=self.test_file))
+        self.servers_client.delete_server(self.instance['id'])
