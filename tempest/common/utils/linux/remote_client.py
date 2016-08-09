@@ -251,7 +251,7 @@ class RemoteClient(RemoteClientBase):
         return self.exec_command(cmd)
 
     def delete_file(self, file_name):
-        cmd = 'rm -f %s' % file_name
+        cmd = 'sudo rm -f %s' % file_name
         output = self.exec_command(cmd)
         return output
 
