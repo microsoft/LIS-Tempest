@@ -1699,6 +1699,35 @@ class LisBase(ScenarioTest):
             hvServer=self.host_name,
             diskName=disk_name)
 
+    def resize_disk(self, instance_name, disk_name, size, action):
+        disk_path = self.default_vhd_path()
+        disk = disk_path.rstrip() + "\\" + disk_name
+        size = size.replace('GB', '')
+        size = long(size)
+
+        if action == 'grow' or action == 'growfs':
+            new_size = (size + 1) * 1024 * 1024 * 1024
+        elif action == 'shrink':
+            new_size = (size - 1) * 1024 * 1024 * 1024
+        else:
+            raise Exception("Disk resize action not recognized")
+
+        self.host_client.run_powershell_cmd(
+            'Resize-VHD',
+            ComputerName=self.host_name,
+            Path="'{disk}'".format(disk=disk),
+            SizeBytes=new_size)
+
+        size_check = self.host_client.get_powershell_cmd_attribute(
+            'Get-VHD', 'Size',
+            ComputerName=self.host_name,
+            Path="'{disk}'".format(disk=disk))
+
+        self.assertTrue(new_size == long(size_check),
+                        "Failed to resize disk to {new_size}".format(new_size=new_size))
+
+        return new_size
+
     def make_passthrough_offline(self, disk_name):
         """Detach a PassThrough disk from a vm"""
 
