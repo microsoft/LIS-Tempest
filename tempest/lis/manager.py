@@ -1942,8 +1942,8 @@ class LisBase(ScenarioTest):
             VMName=instance_name,
             Name=service)
 
-        assert_msg = '${0} disabled for VM ${1}'.format(service, instance_name)
-        self.assertTrue(s_out.lower() != 'True', assert_msg)
+        assert_msg = '{0} disabled for VM {1}'.format(service, instance_name)
+        self.assertTrue(s_out.strip() == 'True', assert_msg)
         return s_out.lower().strip()
 
     def verify_lis_status(self, instance_name, service):
@@ -1953,9 +1953,9 @@ class LisBase(ScenarioTest):
             VMName=instance_name,
             Name=service)
 
-        assert_msg = '${0} is not operational for VM ${1}'.format(
+        assert_msg = '{0} is not operational for VM {1}'.format(
             service, instance_name)
-        self.assertTrue(s_out.lower() != 'Ok', assert_msg)
+        self.assertTrue(s_out.strip() == 'Ok', assert_msg)
         return s_out.lower().strip()
 
     def enable_lis(self, instance_name, service):
@@ -2054,7 +2054,7 @@ class LisBase(ScenarioTest):
             Name='Heartbeat')
 
         assert_msg = 'Heartbeat lost communication to VM'
-        self.assertTrue(s_out.lower() != 'lost communication', assert_msg)
+        self.assertTrue(s_out.strip().lower() != 'lost communication', assert_msg)
 
     def format_disk(self, expected_disk_count, filesystem):
         script_name = 'STOR_Lis_Disk.sh'
