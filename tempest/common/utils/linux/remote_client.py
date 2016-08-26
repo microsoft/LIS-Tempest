@@ -265,7 +265,7 @@ class RemoteClient(RemoteClientBase):
         return self.exec_command(cmd)
 
     def check_file_existence(self, file_name):
-        cmd = ' [ -f %s ] && echo 1 || echo 0' % file_name
+        cmd = ' [ -f %s ] && echo 0 || echo 1' % file_name
         return int(self.exec_command(cmd))
 
     def check_file_size(self, file_name):
@@ -282,6 +282,31 @@ class RemoteClient(RemoteClientBase):
             str(sleep_count) + '; sudo fdisk -l | grep "Disk /dev/sd*" | wc -l'
         output = self.exec_command(command)
         return int(output)
+
+    def get_disks_size(self, disk, sleep_count=1):
+        command = 'sleep ' + \
+            str(sleep_count) + "; sudo fdisk -l /dev/{disk}  2> /dev/null | grep Disk | grep {disk} | cut -f 5 -d ' '".format(disk=disk)
+        output = self.exec_command(command)
+        return int(output)
+
+    def disk_rescan(self, sleep_count=1):
+        command = 'sleep ' + \
+            str(sleep_count) + '; sudo fdisk -l > /dev/null;' + \
+            'echo 1 > sudo /sys/block/sdb/device/rescan'
+        self.exec_command(command)
+
+    def delete_partition(self, disk):
+        command = '(echo d; echo w) | sudo fdisk /dev/{disk} 2> /dev/null'.format(disk=disk)
+        self.exec_command(command)
+
+    def recreate_partition(self, disk):
+        command = '(echo d; echo n; echo; echo; echo; echo; echo w) | sudo fdisk /dev/{disk} 2> /dev/null'.format(disk=disk)
+        self.exec_command(command)
+
+    def grow_xfs(self, mount_path='/mnt'):
+        command = 'sudo xfs_growfs -d {mount_path}'.format(
+            mount_path=mount_path)
+        self.exec_command(command)
 
     def verify_ping(self, destination_ip, dev='eth0'):
         cmd = "ping -I {dev} -c 10 {destination_ip}".format(

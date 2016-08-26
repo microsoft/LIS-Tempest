@@ -1699,6 +1699,35 @@ class LisBase(ScenarioTest):
             hvServer=self.host_name,
             diskName=disk_name)
 
+    def resize_disk(self, instance_name, disk_name, size, action):
+        disk_path = self.default_vhd_path()
+        disk = disk_path.rstrip() + "\\" + disk_name
+        size = size.replace('GB', '')
+        size = long(size)
+
+        if action == 'grow' or action == 'growfs':
+            new_size = (size + 1) * 1024 * 1024 * 1024
+        elif action == 'shrink':
+            new_size = (size - 1) * 1024 * 1024 * 1024
+        else:
+            raise Exception("Disk resize action not recognized")
+
+        self.host_client.run_powershell_cmd(
+            'Resize-VHD',
+            ComputerName=self.host_name,
+            Path="'{disk}'".format(disk=disk),
+            SizeBytes=new_size)
+
+        size_check = self.host_client.get_powershell_cmd_attribute(
+            'Get-VHD', 'Size',
+            ComputerName=self.host_name,
+            Path="'{disk}'".format(disk=disk))
+
+        self.assertTrue(new_size == long(size_check),
+                        "Failed to resize disk to {new_size}".format(new_size=new_size))
+
+        return new_size
+
     def make_passthrough_offline(self, disk_name):
         """Detach a PassThrough disk from a vm"""
 
@@ -1913,8 +1942,8 @@ class LisBase(ScenarioTest):
             VMName=instance_name,
             Name=service)
 
-        assert_msg = '${0} disabled for VM ${1}'.format(service, instance_name)
-        self.assertTrue(s_out.lower() != 'True', assert_msg)
+        assert_msg = '{0} disabled for VM {1}'.format(service, instance_name)
+        self.assertTrue(s_out.strip() == 'True', assert_msg)
         return s_out.lower().strip()
 
     def verify_lis_status(self, instance_name, service):
@@ -1924,9 +1953,9 @@ class LisBase(ScenarioTest):
             VMName=instance_name,
             Name=service)
 
-        assert_msg = '${0} is not operational for VM ${1}'.format(
+        assert_msg = '{0} is not operational for VM {1}'.format(
             service, instance_name)
-        self.assertTrue(s_out.lower() != 'Ok', assert_msg)
+        self.assertTrue(s_out.strip() == 'Ok', assert_msg)
         return s_out.lower().strip()
 
     def enable_lis(self, instance_name, service):
@@ -2025,7 +2054,7 @@ class LisBase(ScenarioTest):
             Name='Heartbeat')
 
         assert_msg = 'Heartbeat lost communication to VM'
-        self.assertTrue(s_out.lower() != 'lost communication', assert_msg)
+        self.assertTrue(s_out.strip().lower() != 'lost communication', assert_msg)
 
     def format_disk(self, expected_disk_count, filesystem):
         script_name = 'STOR_Lis_Disk.sh'
