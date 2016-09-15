@@ -427,7 +427,7 @@ class RestClient(object):
         caller_name = misc_utils.find_test_caller()
         if secs:
             secs = " %.3fs" % secs
-        self.LOG.info(
+        self.LOG.debug(
             'Request (%s): %s %s %s%s' % (
                 caller_name,
                 resp['status'],

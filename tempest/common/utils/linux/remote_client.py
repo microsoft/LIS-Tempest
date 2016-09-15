@@ -73,7 +73,7 @@ class RemoteClientBase():
             self.copy_over(source, destination)
             cmd_args = ' '.join(str(x) for x in cmd_params)
             command = ("cd %(dest)s; chmod +x %(cmd)s; sed -i 's/\r//' %(cmd)s; "
-                       './%(cmd)s %(cmd_args)s') % {
+                       'sudo ./%(cmd)s %(cmd_args)s') % {
                 'dest': destination,
                 'cmd': cmd,
                 'cmd_args': cmd_args}
@@ -156,15 +156,27 @@ class RemoteClient(RemoteClientBase):
         nic = self.exec_command(cmd)
         return nic.strip().strip(":").lower()
 
+    def get_ip4_by_nic_name(self, nic):
+        cmd = "ip addr show {0} | awk '$1 ~ /^inet$/ {{print $2}}'".format(nic)
+        ip = self.exec_command(cmd)
+        return ip.split('/')[0]
+
     def get_ip_list(self):
         cmd = "ip address"
         return self.exec_command(cmd)
 
-    def assign_static_ip(self, nic, addr):
+    def assign_static_ip(self, nic, addr, net_mask=None, brd=None):
+        if net_mask is None:
+            net_mask = CONF.network.tenant_network_mask_bits
         cmd = "sudo ip addr add {ip}/{mask} dev {nic}".format(
-            ip=addr, mask=CONF.network.tenant_network_mask_bits,
-            nic=nic
-        )
+            ip=addr, mask=net_mask, nic=nic)
+        if brd is not None:
+            cmd += ' brd {}'.format(brd)
+        return self.exec_command(cmd)
+
+    def create_nic_vlan_tag(self, nic_name, vlan):
+        cmd = 'sudo ip link add link {nic_name} name {nic_name}.{vlan_id} ' \
+              'type vlan id {vlan_id}'.format(nic_name=nic_name, vlan_id=vlan)
         return self.exec_command(cmd)
 
     def set_nic_state(self, nic, state="up"):
@@ -183,6 +195,16 @@ class RemoteClient(RemoteClientBase):
         dns_servers = [l[1] for l in entries
                        if len(l) and l[0] == 'nameserver']
         return dns_servers
+
+    def set_nic_mtu_size(self, nic, mtu_size):
+        cmd = "sudo ifconfig {nic} mtu {mtu_size}".format(nic=nic,
+                                                          mtu_size=mtu_size)
+        return self.exec_command(cmd)
+
+    def set_nic_promiscuous(self, nic, state='on'):
+        cmd = "sudo ip link set {nic} promisc {state}".format(nic=nic,
+                                                          state=state)
+        return self.exec_command(cmd)
 
     def send_signal(self, pid, signum):
         cmd = 'sudo /bin/kill -{sig} {pid}'.format(pid=pid, sig=signum)
@@ -250,6 +272,11 @@ class RemoteClient(RemoteClientBase):
         cmd = 'echo abc > %s' % file_name
         return self.exec_command(cmd)
 
+    def create_large_file(self, file_name):
+        cmd = 'dd if=/dev/zero of=/tmp/{} bs=10M count=1024'.format(file_name)
+        self.exec_command(cmd)
+        return '/tmp/' + file_name
+
     def delete_file(self, file_name):
         cmd = 'sudo rm -f %s' % file_name
         output = self.exec_command(cmd)
@@ -308,10 +335,23 @@ class RemoteClient(RemoteClientBase):
             mount_path=mount_path)
         self.exec_command(command)
 
-    def verify_ping(self, destination_ip, dev='eth0'):
+    def verify_ping(self, destination_ip, dev='eth0', mtu_size=None):
         cmd = "ping -I {dev} -c 10 {destination_ip}".format(
             dev=dev, destination_ip=destination_ip)
+        if mtu_size is not None:
+            cmd += " -M do -s {mtu_size}".format(mtu_size=mtu_size)
         return self.exec_command(cmd)
+
+    def set_cpu_count_online(self, cpu_count):
+        total_cpus = int(self.exec_command('find /sys/devices/system/cpu/ '
+                                           '-maxdepth 1 -regextype sed '
+                                           '-regex ".*cpu[0-9]\+" | wc -l'))
+        if cpu_count > total_cpus:
+            raise Exception('Request is exceeding the number of online cpus')
+
+        for i in range(cpu_count, total_cpus):
+            cmd = "echo 0 > /sys/devices/system/cpu/cpu{}/online".format(i)
+            self.exec_command(cmd)
 
     def kvp_verify_value(self, key, value, pool):
         cmd = "chmod 755 /tmp/kvp_client; "

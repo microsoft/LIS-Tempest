@@ -317,6 +317,13 @@ HostGroup = [
     cfg.StrOpt('host_setupscripts_folder',
                help="Hyper-V setupscripts folder "
                     "This is a required option"),
+    cfg.StrOpt('host_net_interface',
+               help="Hyper-V net interface for creating virtual switches for "
+                    "testing. This is required for networking tests that use an"
+                    " external connection."),
+    cfg.StrOpt('host_external_sw',
+               help="Hyper-V external switch - this is used for external "
+                    "network tests without creating a new switch."),
     cfg.StrOpt('host_vssbackup_drive',
                help='Target drive for the Hyper-V VSS backups.'
                     'This drive has to be different from the boot drive.'
