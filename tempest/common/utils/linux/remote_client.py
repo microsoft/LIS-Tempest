@@ -73,7 +73,7 @@ class RemoteClientBase():
             self.copy_over(source, destination)
             cmd_args = ' '.join(str(x) for x in cmd_params)
             command = ("cd %(dest)s; chmod +x %(cmd)s; sed -i 's/\r//' %(cmd)s; "
-                       'sudo ./%(cmd)s %(cmd_args)s') % {
+                       './%(cmd)s %(cmd_args)s') % {
                 'dest': destination,
                 'cmd': cmd,
                 'cmd_args': cmd_args}

@@ -68,11 +68,11 @@ class Network(manager.LisBase):
         self.image_ssh_user = CONF.validation.image_ssh_user
         self.host_username = CONF.host_credentials.host_user_name
         self.host_password = CONF.host_credentials.host_password
-        if hasattr(CONF.host_credentials, 'host_net_interface'):
+        if CONF.host_credentials.host_net_interface is not None:
             self.host_net_interface = '\'' +\
                                       CONF.host_credentials.host_net_interface\
                                       + '\''
-        if hasattr(CONF.host_credentials, 'host_external_sw'):
+        if CONF.host_credentials.host_external_sw is not None:
             self.host_external_sw = '\'' +\
                                     CONF.host_credentials.host_external_sw\
                                     + '\''
@@ -184,11 +184,25 @@ class Network(manager.LisBase):
         kw_args = dict()
         if av_zone is not None:
             kw_args['availability_zone'] = av_zone
-        return self.create_server(flavor=self.flavor_ref,
-                                  image_id=self.image_ref,
-                                  key_name=key_pair['name'],
-                                  security_groups=security_groups,
-                                  wait_until='ACTIVE', **kw_args)
+        instance = self.create_server(flavor=self.flavor_ref,
+                                      image_id=self.image_ref,
+                                      key_name=key_pair['name'],
+                                      security_groups=security_groups,
+                                      wait_until='ACTIVE', **kw_args)
+        # Obtain a floating IP
+        floating_network_id = CONF.network.public_network_id
+        floating_ip = self.floating_ips_client.create_floatingip(
+            floating_network_id=floating_network_id)
+        self.addCleanup(self.delete_wrapper,
+                        self.floating_ips_client.delete_floatingip,
+                        floating_ip['floatingip']['floating_ip_address'])
+        # Attach a floating IP
+        self.compute_floating_ips_client.associate_floating_ip_to_server(
+            floating_ip['floatingip']['floating_ip_address'],
+            instance['id'])
+        instance['floating_ip'] = floating_ip['floatingip'][
+            'floating_ip_address']
+        return instance
 
     def _add_nic_to_vm(self, instance, switch_name, host_client,
                        static_mac=True, is_legacy=False, vlan=None):
@@ -239,7 +253,7 @@ class Network(manager.LisBase):
         :return: linux_client, new_nic_name
         :rtype: Tuple
         """
-        instance_ip = instance['addresses']['private'][0]['addr']
+        instance_ip = instance['floating_ip']
         linux_client = self.get_remote_client(
             ip_address=instance_ip,
             username=self.image_ssh_user,
@@ -410,6 +424,9 @@ class Network(manager.LisBase):
         external_setup['key_pair'] = key_pair
         external_setup['host_client'] = host_client
         external_setup['host_name'] = host_name
+
+        if not all(ip is '' for ip in external_setup['dhcp_ips']):
+            raise Exception('No DHCP IP found. Please check dhcp availability.')
 
         return external_setup
 
@@ -627,8 +644,6 @@ class Basic(Network):
     @test.services('compute', 'network')
     def test_vlan_tagging_external_network(self):
         external_setup = self.external_network_setup(vlan=10)
-        if not all(ip is '' for ip in external_setup['dhcp_ips']):
-            raise Exception('No DHCP IP found. Please check VLAN availability.')
 
         o1 = external_setup['linux_clients'][0].verify_ping(
             external_setup['dhcp_ips'][0], dev=external_setup['new_nics'][0])
