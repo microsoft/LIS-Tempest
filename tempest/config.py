@@ -322,7 +322,7 @@ HostGroup = [
                     "testing. This is required for networking tests that use an"
                     " external connection."),
     cfg.StrOpt('host_external_sw',
-               help="Hyper-V external switch - this is used for external "
+               help="Hyper-V external switch - this is for external "
                     "network tests without creating a new switch."),
     cfg.StrOpt('host_vssbackup_drive',
                help='Target drive for the Hyper-V VSS backups.'
@@ -579,8 +579,7 @@ NetworkGroup = [
                     " ['normal','direct','macvtap']"),
     cfg.ListOpt('default_network',
                 default=["1.0.0.0/16", "2.0.0.0/16"],
-                help="List of ip pools"
-                     " for subnetpools creation"),
+                help="List of ip pools for subnetpools creation"),
 ]
 
 network_feature_group = cfg.OptGroup(name='network-feature-enabled',

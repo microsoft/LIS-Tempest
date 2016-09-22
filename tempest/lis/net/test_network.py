@@ -101,10 +101,12 @@ class Network(manager.LisBase):
                 floating_network_id=floating_network_id)
             self.addCleanup(self.delete_wrapper,
                             self.floating_ips_client.delete_floatingip,
-                            self.floating_ip['floatingip']['floating_ip_address'])
+                            self.floating_ip['floatingip'][
+                                'floating_ip_address'])
             # Attach a floating IP
             self.compute_floating_ips_client.associate_floating_ip_to_server(
-                self.floating_ip['floatingip']['floating_ip_address'], self.instance['id'])
+                self.floating_ip['floatingip']['floating_ip_address'],
+                self.instance['id'])
             # Check ssh
             try:
                 self.get_remote_client(
@@ -125,10 +127,12 @@ class Network(manager.LisBase):
                 floating_network_id=floating_network_id)
             self.addCleanup(self.delete_wrapper,
                             self.floating_ips_client.delete_floatingip,
-                            self.floating_ip['floatingip']['floating_ip_address'])
+                            self.floating_ip['floatingip'][
+                                'floating_ip_address'])
             # Attach a floating IP
             self.compute_floating_ips_client.associate_floating_ip_to_server(
-                self.floating_ip['floatingip']['floating_ip_address'], self.instance['id'])
+                self.floating_ip['floatingip']['floating_ip_address'],
+                self.instance['id'])
             # Check lis presence
             try:
                 linux_client = self.get_remote_client(
@@ -138,7 +142,7 @@ class Network(manager.LisBase):
                     private_key=self.keypair['private_key'])
 
                 output = linux_client.verify_ping(destination_ip)
-                LOG.info('Ping resuls ${0}'.format(output))
+                LOG.info('Ping results ${0}'.format(output))
                 self.assertNotEqual(0, output)
             except Exception:
                 LOG.exception('ssh to server failed')
@@ -146,7 +150,7 @@ class Network(manager.LisBase):
                 raise
 
     @staticmethod
-    def remove_vswitch(host_client, sw_name=None):
+    def _remove_vswitch(host_client, sw_name=None):
         """Cleanup for vSwitch disks"""
         if sw_name is None:
             raise Exception('Please specify the switch to be removed')
@@ -155,7 +159,7 @@ class Network(manager.LisBase):
             '-ErrorAction SilentlyContinue'.format(sw_name=sw_name))
 
     @staticmethod
-    def gen_random_mac():
+    def _gen_random_mac():
         """
         Generate a MAC address in HyperV reserved pool.
         :return: MAC address, e.g. 00:15:5d:11:11:11
@@ -166,6 +170,19 @@ class Network(manager.LisBase):
                    random.randint(0x00, 0xff),
                    random.randint(0x00, 0xff)]
         return ':'.join(format(x, '02x') for x in new_mac)
+
+    def _get_floating_ip(self):
+        """
+        Request create a floating IP.
+        :return: floating IP
+        """
+        floating_network_id = CONF.network.public_network_id
+        floating_ip = self.floating_ips_client.create_floatingip(
+            floating_network_id=floating_network_id)
+        self.addCleanup(self.delete_wrapper,
+                        self.floating_ips_client.delete_floatingip,
+                        floating_ip['floatingip']['floating_ip_address'])
+        return floating_ip['floatingip']['floating_ip_address']
 
     def _create_vm(self, key_pair=None, security_groups=None, av_zone=None):
         """
@@ -190,18 +207,11 @@ class Network(manager.LisBase):
                                       security_groups=security_groups,
                                       wait_until='ACTIVE', **kw_args)
         # Obtain a floating IP
-        floating_network_id = CONF.network.public_network_id
-        floating_ip = self.floating_ips_client.create_floatingip(
-            floating_network_id=floating_network_id)
-        self.addCleanup(self.delete_wrapper,
-                        self.floating_ips_client.delete_floatingip,
-                        floating_ip['floatingip']['floating_ip_address'])
+        floating_ip = self._get_floating_ip()
         # Attach a floating IP
         self.compute_floating_ips_client.associate_floating_ip_to_server(
-            floating_ip['floatingip']['floating_ip_address'],
-            instance['id'])
-        instance['floating_ip'] = floating_ip['floatingip'][
-            'floating_ip_address']
+            floating_ip, instance['id'])
+        instance['floating_ip'] = floating_ip
         return instance
 
     def _add_nic_to_vm(self, instance, switch_name, host_client,
@@ -229,7 +239,7 @@ class Network(manager.LisBase):
         ps_args['VSwitchName'] = switch_name
         ps_args['NICName'] = 'nic' + naming_suffix
         if static_mac is True:
-            ps_args['MAC'] = self.gen_random_mac()
+            ps_args['MAC'] = self._gen_random_mac()
         if is_legacy is True:
             ps_args['IsLegacy'] = is_legacy
         if vlan is not None:
@@ -271,8 +281,7 @@ class Network(manager.LisBase):
             linux_client.execute_script(script_name, cmd_params,
                                         full_script_path, destination)
         else:
-            # assuming IP is assigned by DHCP
-            # TODO lookup for instance platform dependent tools for dhcp
+            # assuming IP can be assigned by DHCP
             linux_client.exec_command('sudo dhclient {}'.format(nic_name))
         return linux_client, nic_name
 
@@ -314,7 +323,7 @@ class Network(manager.LisBase):
         for key in ps_args:
             if 'Switch' in key and ps_args[key]:
                 # adding cleanup last to avoid interference with other methods
-                self._cleanups.insert(0, (self.remove_vswitch, (host_client, ),
+                self._cleanups.insert(0, (self._remove_vswitch, (host_client,),
                                           {'sw_name': ps_args[key]}))
         return host_client, ps_args
 
@@ -356,7 +365,7 @@ class Network(manager.LisBase):
                    nic_name=nic_name, vlan_list=vlan_list, base_vlan=base_vlan)
         )
 
-    def external_network_setup(self, vlan=None, create_sw=True):
+    def external_network_setup(self, vlan=None, create_sw=False):
         """
         Internal network setup with 2 dhcp IP instances and vSwitch creation
         attaching the tempest.conf Hyper-V interface (assuming this has an IP)
@@ -371,12 +380,12 @@ class Network(manager.LisBase):
                                              inst2_nic_args['NICName']]
             external_setup['new_macs'] = [inst1_nic_args['MAC'],
                                           inst2_nic_args['MAC']]
-            external_setup['dhcp_ips'] = [inst1_dhcp_ip, inst2_dhcp_ip]
+            external_setup['float_ips'] = [ip1, ip2]
             external_setup['key_pair'] = key_pair
             external_setup['host_client'] = host_client
             external_setup['host_name'] = host_name
         """
-        # TODO add alternative to use existing external network and nova dhcp
+        # use existing external network assigning nova floating ips
         key_pair = self.create_keypair()
         security_group = self._create_security_group()
         security_groups = [{'name': security_group['name']}]
@@ -399,18 +408,19 @@ class Network(manager.LisBase):
             sw_names = dict()
             sw_names['externalSwitch'] = self.host_external_sw
 
+        # Obtain a floating IPs and assign manually to new NIC
+        ip1 = self._get_floating_ip()
+        ip2 = self._get_floating_ip()
+        net_mask = '24'
         inst1_nic_args = self._add_nic_to_vm(inst1, sw_names['externalSwitch'],
                                              host_client, vlan=vlan)
         linux_client1, inst1_new_nic_name = self._set_vm_ip(
-            inst1, key_pair, inst1_nic_args['MAC'])
+            inst1, key_pair, inst1_nic_args['MAC'], ip1, net_mask)
 
         inst2_nic_args = self._add_nic_to_vm(inst2, sw_names['externalSwitch'],
                                              host_client, vlan=vlan)
         linux_client2, inst2_new_nic_name = self._set_vm_ip(
-            inst2, key_pair, inst2_nic_args['MAC'])
-
-        inst1_dhcp_ip = linux_client1.get_ip4_by_nic_name(inst1_new_nic_name)
-        inst2_dhcp_ip = linux_client2.get_ip4_by_nic_name(inst2_new_nic_name)
+            inst2, key_pair, inst2_nic_args['MAC'], ip2, net_mask)
 
         external_setup = dict()
         external_setup['instances'] = [inst1, inst2]
@@ -420,13 +430,13 @@ class Network(manager.LisBase):
                                          inst2_nic_args['NICName']]
         external_setup['new_macs'] = [inst1_nic_args['MAC'],
                                       inst2_nic_args['MAC']]
-        external_setup['dhcp_ips'] = [inst1_dhcp_ip, inst2_dhcp_ip]
+        external_setup['float_ips'] = [ip1, ip2]
         external_setup['key_pair'] = key_pair
         external_setup['host_client'] = host_client
         external_setup['host_name'] = host_name
 
-        if not all(ip is '' for ip in external_setup['dhcp_ips']):
-            raise Exception('No DHCP IP found. Please check dhcp availability.')
+        if not all(ip for ip in external_setup['float_ips']):
+            raise Exception('No IP found. Please check network availability.')
 
         return external_setup
 
@@ -580,9 +590,9 @@ class Basic(Network):
         external_setup = self.external_network_setup()
 
         o1 = external_setup['linux_clients'][0].verify_ping(
-            external_setup['dhcp_ips'][0], dev=external_setup['new_nics'][0])
+            external_setup['float_ips'][0], dev=external_setup['new_nics'][0])
         o2 = external_setup['linux_clients'][1].verify_ping(
-            external_setup['dhcp_ips'][0], dev=external_setup['new_nics'][1])
+            external_setup['float_ips'][0], dev=external_setup['new_nics'][1])
 
         LOG.info('Ping results ${0}'.format(o1))
         LOG.info('Ping results ${0}'.format(o2))
@@ -620,8 +630,8 @@ class Basic(Network):
 
         self.copy_large_file(external_setup['linux_clients'][0],
                              external_setup['key_pair']['private_key'],
-                             external_setup['dhcp_ips'][0],
-                             external_setup['dhcp_ips'][1])
+                             external_setup['float_ips'][0],
+                             external_setup['float_ips'][1])
 
     @test.services('compute', 'network')
     def test_copy_large_file_internal_network(self):
@@ -646,9 +656,9 @@ class Basic(Network):
         external_setup = self.external_network_setup(vlan=10)
 
         o1 = external_setup['linux_clients'][0].verify_ping(
-            external_setup['dhcp_ips'][0], dev=external_setup['new_nics'][0])
+            external_setup['float_ips'][0], dev=external_setup['new_nics'][0])
         o2 = external_setup['linux_clients'][1].verify_ping(
-            external_setup['dhcp_ips'][0], dev=external_setup['new_nics'][1])
+            external_setup['float_ips'][0], dev=external_setup['new_nics'][1])
 
         LOG.info('Ping results ${0}'.format(o1))
         LOG.info('Ping results ${0}'.format(o2))
@@ -715,9 +725,9 @@ class Basic(Network):
         external_setup = self.external_network_setup()
 
         o1 = external_setup['linux_clients'][0].verify_ping(
-            external_setup['dhcp_ips'][1], dev=external_setup['new_nics'][0])
+            external_setup['float_ips'][1], dev=external_setup['new_nics'][0])
         o2 = external_setup['linux_clients'][1].verify_ping(
-            external_setup['dhcp_ips'][0], dev=external_setup['new_nics'][1])
+            external_setup['float_ips'][0], dev=external_setup['new_nics'][1])
 
         LOG.info('Ping results ${0}'.format(o1))
         LOG.info('Ping results ${0}'.format(o2))
@@ -805,10 +815,10 @@ class Basic(Network):
 
         # for ping packet size should be -28 to allow packet padding
         o1 = external_setup['linux_clients'][0].verify_ping(
-            external_setup['dhcp_ips'][1], dev=external_setup['new_nics'][0],
+            external_setup['float_ips'][1], dev=external_setup['new_nics'][0],
             mtu_size=mtu - 28)
         o2 = external_setup['linux_clients'][1].verify_ping(
-            external_setup['dhcp_ips'][0], dev=external_setup['new_nics'][1],
+            external_setup['float_ips'][0], dev=external_setup['new_nics'][1],
             mtu_size=mtu - 28)
 
         LOG.info('Ping results ${0}'.format(o1))
@@ -846,7 +856,7 @@ class Basic(Network):
         host_client, sw_names = self._create_vswitch(host_name,
                                                      internal_sw=True)
         host_ip = '22.22.22.1'
-        net_mask = '8'
+        net_mask = '24'
         self._config_hyperv_nic(host_client, sw_names['internalSwitch'],
                                 host_ip, net_mask)
 
@@ -869,7 +879,6 @@ class Basic(Network):
         # ensure legacy net is supported by setting a single cpu online
         linux_client.set_cpu_count_online(1)
 
-        print(linux_client.exec_command('ifconfig -a'))
         o1 = linux_client.verify_ping(host_ip, dev=instance_nic_name1)
         o2 = linux_client.verify_ping(host_ip, dev=instance_nic_name2)
 
