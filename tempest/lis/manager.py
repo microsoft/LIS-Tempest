@@ -1860,6 +1860,16 @@ class LisBase(ScenarioTest):
             Name=instance_name,
             ProcessorCount=new_cpu_count)
 
+    def change_cpu_numa(self, instance_name, numa_nodes, sockets):
+        """Change the numa nodes and sockets of vcpu cores"""
+
+        self.host_client.run_powershell_cmd(
+            'Set-VMProcessor',
+            ComputerName=self.host_name,
+            VMName=instance_name,
+            MaximumCountPerNumaNode=numa_nodes,
+            MaximumCountPerNumaSocket=sockets)
+
     def take_snapshot(self, instance_name, snapshot_name):
         """ Take a snapshot of a VM. """
 
@@ -1975,6 +1985,13 @@ class LisBase(ScenarioTest):
             ComputerName=self.host_name,
             VMName=self.instance_name,
             Name=service)
+
+    def disable_dynamic_memory(self, instance_name):
+        self.host_client.run_powershell_cmd(
+            'Set-VMMemory',
+            ComputerName=self.host_name,
+            VMName=instance_name,
+            DynamicMemoryEnabled='$false')
 
     def get_ram_settings(self, instance_name):
         s_out = self.host_client.get_powershell_cmd_attribute(
