@@ -7,7 +7,7 @@ use_stderr = False
 use_dynamic_credentials = True
 admin_username = admin
 admin_tenant_name = admin
-admin_password = Passw0rd
+admin_password = ''
 create_isolated_networks = false
 tempest_roles = Admin
 
@@ -18,6 +18,10 @@ s3_url = None
 
 [host_credentials]
 host_setupscripts_folder = C:\lis-tempest-ps\
+host_user_name = ''
+host_password = ''
+host_net_interface = ''
+host_external_sw = ''
 
 [compute]
 floating_network_name = public
@@ -42,10 +46,10 @@ plugins = vanilla,cdh,mapr,spark,ambari
 
 [identity]
 username = admin
-password = Passw0rd
+password = ''
 tenant_name = admin
 admin_username = admin
-admin_password = Passw0rd
+admin_password = ''
 admin_tenant_name = admin
 region = RegionOne
 auth_version = v2
