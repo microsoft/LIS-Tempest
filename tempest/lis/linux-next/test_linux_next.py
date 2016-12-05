@@ -167,7 +167,7 @@ class LinuxNext(manager.LisBase):
         self.image_ref = snapshot_image['id']
         self.servers_client.delete_server(self.instance['id'])
         self.spawn_vm()
-        self.verify_lis(self.instance_name, 'Heartbeat')
+        self.verify_lis_status(self.instance_name, 'Heartbeat')
         self._initiate_linux_client(self.floating_ip['floatingip']['floating_ip_address'],
                                     self.ssh_user, self.keypair['private_key'])
         kernel_next = self.linux_client.get_kernel_version()

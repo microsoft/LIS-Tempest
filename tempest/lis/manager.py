@@ -1952,8 +1952,6 @@ class LisBase(ScenarioTest):
             VMName=instance_name,
             Name=service)
 
-        assert_msg = '{0} disabled for VM {1}'.format(service, instance_name)
-        self.assertTrue(s_out.strip() == 'True', assert_msg)
         return s_out.lower().strip()
 
     def verify_lis_status(self, instance_name, service):
@@ -1965,7 +1963,7 @@ class LisBase(ScenarioTest):
 
         assert_msg = '{0} is not operational for VM {1}'.format(
             service, instance_name)
-        self.assertTrue(s_out.strip() == 'Ok', assert_msg)
+        self.assertTrue(s_out.strip()[0] == 'Ok', assert_msg)
         return s_out.lower().strip()
 
     def enable_lis(self, instance_name, service):
