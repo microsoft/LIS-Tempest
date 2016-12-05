@@ -2123,8 +2123,6 @@ class LisBase(ScenarioTest):
                 raise Exception(
                     "Hot Add not supported on {distro}".format(distro=distro))
 
-        print "DISTRO:::: ", distro, distro_check, version, distro_base
-
     def check_heartbeat_status(self, instance_name):
         s_out = self.host_client.get_powershell_cmd_attribute(
             'Get-VMIntegrationService', 'PrimaryStatusDescription',
