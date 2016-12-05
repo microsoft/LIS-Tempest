@@ -203,7 +203,7 @@ class RemoteClient(RemoteClientBase):
 
     def set_nic_promiscuous(self, nic, state='on'):
         cmd = "sudo ip link set {nic} promisc {state}".format(nic=nic,
-                                                          state=state)
+                                                              state=state)
         return self.exec_command(cmd)
 
     def send_signal(self, pid, signum):
@@ -312,7 +312,9 @@ class RemoteClient(RemoteClientBase):
 
     def get_disks_size(self, disk, sleep_count=1):
         command = 'sleep ' + \
-            str(sleep_count) + "; sudo fdisk -l /dev/{disk}  2> /dev/null | grep Disk | grep {disk} | cut -f 5 -d ' '".format(disk=disk)
+            str(sleep_count) + \
+            "; sudo fdisk -l /dev/{disk}  2> /dev/null | grep Disk | grep {disk} | cut -f 5 -d ' '".format(
+                disk=disk)
         output = self.exec_command(command)
         return int(output)
 
@@ -323,11 +325,13 @@ class RemoteClient(RemoteClientBase):
         self.exec_command(command)
 
     def delete_partition(self, disk):
-        command = '(echo d; echo w) | sudo fdisk /dev/{disk} 2> /dev/null'.format(disk=disk)
+        command = '(echo d; echo w) | sudo fdisk /dev/{disk} 2> /dev/null'.format(
+            disk=disk)
         self.exec_command(command)
 
     def recreate_partition(self, disk):
-        command = '(echo d; echo n; echo; echo; echo; echo; echo w) | sudo fdisk /dev/{disk} 2> /dev/null'.format(disk=disk)
+        command = '(echo d; echo n; echo; echo; echo; echo; echo w) | sudo fdisk /dev/{disk} 2> /dev/null'.format(
+            disk=disk)
         self.exec_command(command)
 
     def grow_xfs(self, mount_path='/mnt'):
@@ -368,6 +372,25 @@ class RemoteClient(RemoteClientBase):
             return(output)
         else:
             raise Exception("Invalid KVP: " + output)
+
+    def verify_memory_hotadd_support(self):
+        cmd = "find /etc/udev/rules.d/ /lib/udev/rules.d/ -type f -exec grep -iEw \"SUBSYSTEM==\\\"memory\\\".*ACTION==\\\"add\\\".*ATTR{state}=\\\"online\\\"\" /dev/null {} +"
+        self.exec_command(cmd)
+
+    def check_installed_software(self, name):
+        cmd = "command -v {name}".format(name=name)
+        self.exec_command(cmd)
+
+    def memory_hotadd(self, threads, chunk_size, duration, timeout):
+        cmd = "stress-ng -m {threads} --vm-bytes {size}M -t {duration} --backoff {timeout} &".format(
+            threads=threads, size=chunk_size, duration=duration, timeout=timeout)
+        self.exec_command(cmd)
+
+    def memory_check(self, data="MemTotal"):
+        cmd = "cat /proc/meminfo | grep -i {data} | awk '{ print $2 }'".format(
+            data=data)
+        memory = self.exec_command(cmd)
+        return long(memory)
 
 
 class FedoraUtils(RemoteClient):

@@ -1991,11 +1991,25 @@ class LisBase(ScenarioTest):
             VMName=instance_name,
             DynamicMemoryEnabled='$false')
 
-    def get_ram_settings(self, instance_name):
+    def get_ram_settings(self, instance_name, memory_setting='Startup'):
         s_out = self.host_client.get_powershell_cmd_attribute(
-            'Get-VMMemory', 'Startup',
+            'Get-VMMemory', memory_setting,
             ComputerName=self.host_name,
             VMName=instance_name)
+
+        # setting can be: Minimum, Startup, Maximum
+
+        memory_size = long(s_out)
+        memory_size = memory_size / 1024 / 1024
+        return memory_size
+
+    def get_ram_status(self, instance_name, status='MemoryDemand'):
+        s_out = self.host_client.get_powershell_cmd_attribute(
+            'Get-VM', status,
+            ComputerName=self.host_name,
+            VMName=instance_name)
+
+        # status can be: MemoryDemand, MemoryAssigned
 
         memory_size = long(s_out)
         memory_size = memory_size / 1024 / 1024
@@ -2060,6 +2074,56 @@ class LisBase(ScenarioTest):
             memory_size = memory
 
         return memory_size
+
+    def get_host_memory(self, memory_info):
+        if memory_info.lower() == 'free':
+            meminfo = 'FreePhysicalMemory'
+        elif memory_info.lower == 'total':
+            meminfo = 'TotalVisibleMemorySize'
+        else:
+            raise Exception("Could not understand requirement {0}".format(memory_info))
+
+        meminfo = self.host_client.run_powershell_cmd('gwmi Win32_OperatingSystem | % {$_.{0}}'.format(meminfo))
+
+        return meminfo
+
+    def determine_memory_stress_parameters(self):
+        distro = self.linux_client.get_os_type()
+        if distro:
+            fedora = ['centos', 'red hat', 'oracle']
+            debian = ['debian', 'ubuntu']
+            suse = ['suse', 'sle']
+            distro_index = {0: "fedora", 1: "debian", 2: "suse"}
+            distro_base = [fedora, debian, suse]
+            for k in range(len(distro_base)):
+                distro_check = [i for i in distro_base[
+                    k] if i in distro.lower()]
+                if distro_check:
+                    distro_base = distro_index[k]
+                    version = distro.split(" ")[-1]
+                    break
+        else:
+            raise Exception("Distribution not supported or info not found")
+
+        maximum_memory = self.get_ram_settings(self.instance_name, 'Maximum')
+        self.chunk_size = 128
+        self.threads = maximum_memory / self.chunk_size
+        self.duration = 5 * self.threads
+        self.timeout = 4000000
+
+        if distro_base == "fedora":
+            if int(version.split(".")[0]) == 6 and int(version.split(".")[1]) > 4:
+                self.duration = 9 * self.threads
+                self.timeout = 10000000
+            elif int(version.split(".")[0]) <= 6:
+                raise Exception(
+                    "Hot Add not supported on {distro}".format(distro=distro))
+        if distro_base == "debian":
+            if "12" in version or "debian" in distro.lower():
+                raise Exception(
+                    "Hot Add not supported on {distro}".format(distro=distro))
+
+        print "DISTRO:::: ", distro, distro_check, version, distro_base
 
     def check_heartbeat_status(self, instance_name):
         s_out = self.host_client.get_powershell_cmd_attribute(
