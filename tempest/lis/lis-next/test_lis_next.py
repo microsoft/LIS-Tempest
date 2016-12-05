@@ -110,7 +110,7 @@ class LisNext(manager.LisBase):
         self.install_lis_next()
         self.stop_vm(self.server_id)
         snapshot_image = self.create_server_snapshot_nocleanup(
-            server=self.instance)
+            server=self.instance, name="lis-next-temp")
         # boot a second instance from the snapshot
         self.image_ref = snapshot_image['id']
         self.servers_client.delete_server(self.instance['id'])
